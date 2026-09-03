@@ -23,6 +23,7 @@ import {
   Trash2,
   Upload,
   X,
+  Link,
 } from "lucide-react";
 import { Folder as FolderIcon } from "lucide-react";
 import type { CopyPastable, Folder, VaultBackup } from "./types";
@@ -64,6 +65,8 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const [linkMode, setLinkMode] = useState(false);
+
   const importInput = useRef<HTMLInputElement>(null);
 
   const refresh = async () => {
@@ -93,6 +96,15 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+  if (editor?.kind === "file") {
+    const item = editor.item as CopyPastable | undefined;
+    setLinkMode(item?.title.startsWith("/link ") ?? false);
+  } else {
+    setLinkMode(false);
+  }
+}, [editor]);
 
   const folderMap = useMemo(
     () => new Map(folders.map((folder) => [folder.id, folder])),
@@ -133,9 +145,17 @@ export default function App() {
     const data = new FormData(event.currentTarget);
 
     // Keep the title capped even if something bypasses the HTML maxLength.
-    const name = String(data.get("name") ?? "")
-      .trim()
-      .slice(0, 30);
+    let name = String(data.get("name") ?? "").trim();
+
+    if (linkMode && !name.startsWith("/link ")) {
+      name = `/link ${name}`;
+    }
+
+    if (!linkMode && name.startsWith("/link ")) {
+      name = name.slice(6).trim();
+    }
+
+    name = name.slice(0, 30);
 
     const content = String(data.get("content") ?? "");
 
@@ -934,9 +954,35 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
                * The title and textarea remain separate HTML controls,
                * but visually they belong to the same card.
                */
-              <div className="w-full rounded-[7px] border border-[#303030] bg-[#181818] p-4">
-                <input
-                  name="name"
+
+  <div className="relative w-full rounded-[7px] border border-[#303030] bg-[#181818] p-4">
+  <button
+    type="button"
+    onClick={() => setLinkMode((current) => !current)}
+    className={[
+      "absolute right-4 top-4 inline-flex h-[25px] items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-medium transition-colors",
+      linkMode
+        ? "border-[#4a4a4a] bg-[#292929] text-[#f2f2f2]"
+        : "border-[#303030] bg-[#1e1e1e] text-[#888] hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]",
+    ].join(" ")}
+  >
+    <Link
+      className="h-3 w-3"
+      strokeWidth={1.8}
+    />
+
+    <span>Link</span>
+
+    {linkMode && (
+      <X
+        className="ml-0.5 h-3 w-3"
+        strokeWidth={2}
+      />
+    )}
+  </button>
+
+  <input
+    name="name"
                   autoComplete="off"
                   maxLength={30}
                   autoFocus
