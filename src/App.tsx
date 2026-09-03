@@ -271,6 +271,34 @@ export default function App() {
       );
     }
   };
+    const openSearchResult = (item: CopyPastable) => {
+    // Clear the search surface first so the normal explorer becomes visible.
+    setQuery("");
+
+    // Select the actual file.
+    setOpenFile(item.id);
+
+    // Clear any folder selection because we're opening a specific item.
+    setSelectedFolder(null);
+
+    // Expand every ancestor folder so the selected result is actually
+    // visible in the normal tree.
+    const ancestors = new Set<string>();
+    let parentId = item.parentFolderId;
+
+    while (parentId) {
+      ancestors.add(parentId);
+      parentId = folderMap.get(parentId)?.parentFolderId ?? null;
+    }
+
+    setExpanded((current) => {
+      const next = new Set(current);
+
+      ancestors.forEach((id) => next.add(id));
+
+      return next;
+    });
+  };
 
   const removeFile = async (item: CopyPastable) => {
     if (!window.confirm(`Delete “${item.title}”?`)) return;
@@ -818,32 +846,46 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
 
       {/* Search */}
       <section className="px-4 pb-[9px] pt-3">
-        <label className="flex h-8 items-center gap-2 rounded-[5px] border border-[#303030] bg-[#181818] px-[10px] text-[#808080] focus-within:border-[#3a3a3a]">
+        <label
+          className={[
+            "flex h-8 items-center gap-2 rounded-[5px] border bg-[#181818] px-[10px] text-[#808080]",
+            "transition-[border-color,box-shadow,background-color] duration-150",
+            query
+              ? "border-[#454545] bg-[#1b1b1b] shadow-[0_0_0_2px_rgba(255,255,255,0.025)]"
+              : "border-[#303030]",
+            "focus-within:border-[#4a4a4a] focus-within:bg-[#1b1b1b]",
+          ].join(" ")}
+        >
           <Search
   className="h-3.5 w-3.5 shrink-0"
   strokeWidth={1.8}
 />
 
-          <input
+                    <input
             value={query}
-            onChange={(event) =>
-              setQuery(event.target.value)
-            }
+            onChange={(event) => setQuery(event.target.value)}
             placeholder="Search snippets..."
+            aria-label="Search snippets"
             className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-[#f2f2f2] outline-none placeholder:text-[#606060]"
           />
 
-          <kbd className="flex items-center gap-1 font-mono text-[10px] text-[#606060]">
-
-</kbd>
+                    {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              title="Clear search"
+              className="grid h-5 w-5 shrink-0 place-items-center rounded-[3px] text-[#606060] transition-colors hover:bg-[#292929] hover:text-[#b3b3b3]"
+              onClick={() => setQuery("")}
+            >
+              <X
+                className="h-3 w-3"
+                strokeWidth={2}
+              />
+            </button>
+          )}
         </label>
 
-        {query && (
-          <span className="mt-2 block px-0.5 text-[10px] text-[#808080]">
-            {searchResults.length} result
-            {searchResults.length === 1 ? "" : "s"}
-          </span>
-        )}
+            
       </section>
 
       {/* Explorer */}
@@ -855,33 +897,43 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
       >
         {query ? (
           searchResults.length ? (
-            searchResults.map((item) => (
+                        searchResults.map((item) => (
               <div
                 className="px-[5px] py-px"
                 key={item.id}
               >
                 <button
-                  className="flex h-[43px] w-full items-center gap-[7px] rounded px-[7px] py-[5px] text-left hover:bg-[#242424]"
-                  onClick={() => {
-                    setQuery("");
-                    setOpenFile(item.id);
-                  }}
+                  type="button"
+                  className="group flex min-h-[52px] w-full items-center gap-[9px] rounded-[5px] px-[8px] py-[7px] text-left transition-colors duration-100 hover:bg-[#242424]"
+                  onClick={() => openSearchResult(item)}
                 >
-                  <FileText
-  className="h-3.5 w-3.5 shrink-0 text-[#999]"
-  strokeWidth={1.8}
-/>
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[4px] border border-[#303030] bg-[#181818] text-[#888] transition-colors group-hover:border-[#3a3a3a] group-hover:text-[#b3b3b3]">
+                    <FileText
+                      className="h-3.5 w-3.5"
+                      strokeWidth={1.8}
+                    />
+                  </span>
 
-                  <span>
-                    <strong className="block text-[11px] text-[#f2f2f2]">
+                  <span className="min-w-0 flex-1">
+                    <strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-medium text-[#f2f2f2]">
                       {item.title}
                     </strong>
 
-                    <small className="mt-[3px] block text-[9px] text-[#808080]">
+                    <small className="mt-[2px] block overflow-hidden text-ellipsis whitespace-nowrap text-[9px] text-[#707070]">
+                      {item.content.replace(/\s+/g, " ").trim() ||
+                        "Empty copy-pastable"}
+                    </small>
+
+                    <small className="mt-[2px] block overflow-hidden text-ellipsis whitespace-nowrap text-[8px] text-[#555]">
                       {getPath(item.parentFolderId).join(" / ") ||
                         "Root"}
                     </small>
                   </span>
+
+                  <ChevronRight
+                    className="h-3 w-3 shrink-0 text-[#4f4f4f] transition-transform duration-100 group-hover:translate-x-0.5 group-hover:text-[#808080]"
+                    strokeWidth={1.8}
+                  />
                 </button>
               </div>
             ))
