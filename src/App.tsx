@@ -127,16 +127,63 @@ export default function App() {
     return path;
   };
 
-  const searchResults = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const searchResults = useMemo(() => {
+    const terms = query
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
 
-    if (!needle) return [];
+    if (!terms.length) return [];
 
     return items
-      .filter((item) =>
-        `${item.title} ${item.content}`.toLowerCase().includes(needle),
+      .map((item) => {
+        const title = item.title.toLowerCase();
+        const content = item.content.toLowerCase();
+        const searchable = `${title} ${content}`;
+
+        // Every search term must appear somewhere in the result.
+        if (!terms.every((term) => searchable.includes(term))) {
+          return null;
+        }
+
+        let score = 0;
+
+        for (const term of terms) {
+          // Strongest signal: the title starts with the search term.
+          if (title.startsWith(term)) score += 100;
+
+          // Strong signal: the title contains the term.
+          if (title.includes(term)) score += 50;
+
+          // Content matches are useful, but rank below title matches.
+          if (content.includes(term)) score += 10;
+        }
+
+        // Exact title matches should always float to the top.
+        if (title === query.trim().toLowerCase()) {
+          score += 1000;
+        }
+
+        return {
+          item,
+          score,
+        };
+      })
+      .filter(
+        (
+          result,
+        ): result is {
+          item: CopyPastable;
+          score: number;
+        } => result !== null,
       )
-      .sort((a, b) => a.title.localeCompare(b.title));
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.item.title.localeCompare(b.item.title),
+      )
+      .map(({ item }) => item);
   }, [items, query]);
 
   const submitEditor = async (event: FormEvent<HTMLFormElement>) => {
