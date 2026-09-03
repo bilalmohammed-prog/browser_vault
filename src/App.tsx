@@ -5,6 +5,26 @@ import type {
   FormEvent,
   ReactElement,
 } from "react";
+
+import {
+  ChevronDown,
+  ChevronRight,
+  Command,
+  Copy,
+  Download,
+  FilePlus,
+  FileText,
+  
+  FolderPlus,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import { Folder as FolderIcon } from "lucide-react";
 import type { CopyPastable, Folder, VaultBackup } from "./types";
 import {
   createCopyPastable,
@@ -31,21 +51,7 @@ type EditorState = {
 const uid = () => crypto.randomUUID();
 const timestamp = () => Date.now();
 
-function Icon({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <span
-      className={`inline-flex h-4 w-4 items-center justify-center ${className}`}
-    >
-      {children}
-    </span>
-  );
-}
+
 
 export default function App() {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -460,13 +466,22 @@ export default function App() {
                 });
               }}
             >
-              <span className="w-[9px] text-[16px] leading-none text-[#707070]">
-                {isExpanded ? "⌄" : "›"}
-              </span>
+              {isExpanded ? (
+  <ChevronDown
+    className="h-3.5 w-3.5 shrink-0 text-[#707070]"
+    strokeWidth={1.8}
+  />
+) : (
+  <ChevronRight
+    className="h-3.5 w-3.5 shrink-0 text-[#707070]"
+    strokeWidth={1.8}
+  />
+)}
 
-              <Icon className="text-[13px] text-[#999]">
-                ▰
-              </Icon>
+<FolderIcon
+  className="h-3.5 w-3.5 shrink-0 text-[#999]"
+  strokeWidth={1.8}
+/>
 
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px]">
                 {folder.name}
@@ -474,20 +489,24 @@ export default function App() {
             </button>
 
             <button
-              className="mr-[3px] h-[23px] w-[29px] rounded-[3px] bg-transparent text-[11px] tracking-wider text-[#707070] hover:bg-[#2a2a2a] hover:text-[#f2f2f2]"
-              title="Rename folder"
-              onClick={(event) => {
-                event.stopPropagation();
+  className="mr-[3px] grid h-[23px] w-[29px] place-items-center rounded-[3px] bg-transparent text-[#707070] hover:bg-[#2a2a2a] hover:text-[#f2f2f2]"
+  title="Rename folder"
+  aria-label={`Rename ${folder.name}`}
+  onClick={(event) => {
+    event.stopPropagation();
 
-                setEditor({
-                  kind: "folder",
-                  item: folder,
-                  parentFolderId: folder.parentFolderId,
-                });
-              }}
-            >
-              •••
-            </button>
+    setEditor({
+      kind: "folder",
+      item: folder,
+      parentFolderId: folder.parentFolderId,
+    });
+  }}
+>
+  <MoreHorizontal
+    className="h-3.5 w-3.5"
+    strokeWidth={1.8}
+  />
+</button>
           </div>,
 
           ...(isExpanded
@@ -523,9 +542,10 @@ export default function App() {
               );
             }}
           >
-            <Icon className="text-[13px] text-[#999]">
-              ▤
-            </Icon>
+            <FileText
+  className="h-3.5 w-3.5 shrink-0 text-[#999]"
+  strokeWidth={1.8}
+/>
 
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px]">
               {item.title}
@@ -556,9 +576,12 @@ export default function App() {
                     onClick={() => void copyItem(item)}
                     title="Copy content"
                   >
-                    ↗
-                    <span className="sr-only">Copy</span>
-                  </button>
+  <Copy
+    className="h-3.5 w-3.5"
+    strokeWidth={1.8}
+  />
+  <span className="sr-only">Copy</span>
+</button>
 
                   <button
                     className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
@@ -572,18 +595,24 @@ export default function App() {
                     }
                     title="Edit item"
                   >
-                    ✎
-                    <span className="sr-only">Edit</span>
-                  </button>
+  <Pencil
+    className="h-3.5 w-3.5"
+    strokeWidth={1.8}
+  />
+  <span className="sr-only">Edit</span>
+</button>
 
                   <button
                     className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#4a4a4a] hover:bg-[#242424] hover:text-[#d0d0d0]"
                     onClick={() => void removeFile(item)}
                     title="Delete item"
                   >
-                    ×
-                    <span className="sr-only">Delete</span>
-                  </button>
+  <Trash2
+    className="h-3.5 w-3.5"
+    strokeWidth={1.8}
+  />
+  <span className="sr-only">Delete</span>
+</button>
                 </div>
               </div>,
             ]
@@ -597,9 +626,12 @@ export default function App() {
       {/* Header */}
       <header className="flex items-center justify-between border-b border-[#303030] px-[18px] py-[17px]">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-7 w-7 place-items-center rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] text-[18px] text-[#f2f2f2]">
-            ◇
-          </span>
+          <span className="grid h-7 w-7 place-items-center rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] text-[#f2f2f2]">
+  <ShieldCheck
+    className="h-4 w-4"
+    strokeWidth={1.8}
+  />
+</span>
 
           <div>
             <h1 className="m-0 text-[14px] font-semibold tracking-[-0.1px]">
@@ -614,30 +646,38 @@ export default function App() {
 
         <div className="flex items-center gap-[5px]">
           <button
-            className="h-[29px] rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[10px] font-semibold text-[#b3b3b3] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
-            onClick={() =>
-              setEditor({
-                kind: "folder",
-                parentFolderId: selectedFolder,
-              })
-            }
-            title="New folder"
-          >
-            + <span>Folder</span>
-          </button>
+  className="h-[29px] rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[10px] font-semibold text-[#b3b3b3] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
+  onClick={() =>
+    setEditor({
+      kind: "folder",
+      parentFolderId: selectedFolder,
+    })
+  }
+  title="New folder"
+>
+  <FolderPlus
+    className="mr-1 inline-block h-3.5 w-3.5 align-[-2px]"
+    strokeWidth={1.8}
+  />
+  <span>Folder</span>
+</button>
 
           <button
-            className="h-[29px] rounded-[5px] border border-[#3a3a3a] bg-[#292929] px-[9px] text-[10px] font-semibold text-[#f2f2f2] transition-colors hover:bg-[#242424]"
-            onClick={() =>
-              setEditor({
-                kind: "file",
-                parentFolderId: selectedFolder,
-              })
-            }
-            title="New copy-pastable"
-          >
-            ▤ <span>New</span>
-          </button>
+  className="h-[29px] rounded-[5px] border border-[#3a3a3a] bg-[#292929] px-[9px] text-[10px] font-semibold text-[#f2f2f2] transition-colors hover:bg-[#242424]"
+  onClick={() =>
+    setEditor({
+      kind: "file",
+      parentFolderId: selectedFolder,
+    })
+  }
+  title="New copy-pastable"
+>
+  <FilePlus
+    className="mr-1 inline-block h-3.5 w-3.5 align-[-2px]"
+    strokeWidth={1.8}
+  />
+  <span>New</span>
+</button>
 
           <div className="relative">
             <button
@@ -645,26 +685,35 @@ export default function App() {
               onClick={() => setMenuOpen(!menuOpen)}
               title="Vault settings"
             >
-              •••
-            </button>
+  <MoreHorizontal
+    className="h-4 w-4"
+    strokeWidth={1.8}
+  />
+</button>
 
             {menuOpen && (
               <div className="absolute right-0 top-[34px] z-10 w-[155px] rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
                 <button
-                  className="block w-full rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                  onClick={() => void downloadExport()}
-                >
-                  ↓ Export Vault
-                </button>
+  className="flex w-full items-center gap-2 rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
+  onClick={() => void downloadExport()}
+>
+  <Download
+    className="h-3.5 w-3.5"
+    strokeWidth={1.8}
+  />
+  <span>Export Vault</span>
+</button>
 
                 <button
-                  className="block w-full rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                  onClick={() =>
-                    importInput.current?.click()
-                  }
-                >
-                  ↑ Import Vault
-                </button>
+  className="flex w-full items-center gap-2 rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
+  onClick={() => importInput.current?.click()}
+>
+  <Upload
+    className="h-3.5 w-3.5"
+    strokeWidth={1.8}
+  />
+  <span>Import Vault</span>
+</button>
               </div>
             )}
           </div>
@@ -674,7 +723,10 @@ export default function App() {
       {/* Search */}
       <section className="px-4 pb-[9px] pt-3">
         <label className="flex h-8 items-center gap-2 rounded-[5px] border border-[#303030] bg-[#181818] px-[10px] text-[#808080] focus-within:border-[#3a3a3a]">
-          <span>⌕</span>
+          <Search
+  className="h-3.5 w-3.5 shrink-0"
+  strokeWidth={1.8}
+/>
 
           <input
             value={query}
@@ -685,9 +737,13 @@ export default function App() {
             className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-[#f2f2f2] outline-none placeholder:text-[#606060]"
           />
 
-          <kbd className="font-mono text-[10px] text-[#606060]">
-            ⌘ K
-          </kbd>
+          <kbd className="flex items-center gap-1 font-mono text-[10px] text-[#606060]">
+  <Command
+    className="h-3 w-3"
+    strokeWidth={1.8}
+  />
+  <span>K</span>
+</kbd>
         </label>
 
         {query && (
@@ -719,9 +775,10 @@ export default function App() {
                     setOpenFile(item.id);
                   }}
                 >
-                  <Icon className="text-[13px] text-[#999]">
-                    ▤
-                  </Icon>
+                  <FileText
+  className="h-3.5 w-3.5 shrink-0 text-[#999]"
+  strokeWidth={1.8}
+/>
 
                   <span>
                     <strong className="block text-[11px] text-[#f2f2f2]">
@@ -738,9 +795,12 @@ export default function App() {
             ))
           ) : (
             <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-[#b3b3b3]">
-              <span className="mb-[13px] grid h-10 w-10 place-items-center rounded-lg border border-[#303030] bg-[#181818] text-[21px] text-[#999]">
-                ⌕
-              </span>
+              <span className="mb-[13px] grid h-10 w-10 place-items-center rounded-lg border border-[#303030] bg-[#181818] text-[#999]">
+  <Search
+    className="h-5 w-5"
+    strokeWidth={1.8}
+  />
+</span>
 
               <strong className="text-[12px] text-[#f2f2f2]">
                 No matching snippets
@@ -755,9 +815,12 @@ export default function App() {
           renderTree(null)
         ) : (
           <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-[#b3b3b3]">
-            <span className="mb-[13px] grid h-10 w-10 place-items-center rounded-lg border border-[#303030] bg-[#181818] text-[20px] text-[#999]">
-              ◇
-            </span>
+            <span className="mb-[13px] grid h-10 w-10 place-items-center rounded-lg border border-[#303030] bg-[#181818] text-[#999]">
+  <ShieldCheck
+    className="h-5 w-5"
+    strokeWidth={1.8}
+  />
+</span>
 
             <strong className="text-[12px] text-[#f2f2f2]">
               Your vault is ready
@@ -826,12 +889,17 @@ export default function App() {
               </span>
 
               <button
-                type="button"
-                className="bg-transparent text-[19px] text-[#808080] hover:text-[#f2f2f2]"
-                onClick={() => setEditor(null)}
-              >
-                ×
-              </button>
+  type="button"
+  className="grid h-7 w-7 place-items-center rounded bg-transparent text-[#808080] hover:bg-[#292929] hover:text-[#f2f2f2]"
+  onClick={() => setEditor(null)}
+  title="Close"
+  aria-label="Close"
+>
+  <X
+    className="h-4 w-4"
+    strokeWidth={1.8}
+  />
+</button>
             </div>
 
             {editor.kind === "file" ? (
