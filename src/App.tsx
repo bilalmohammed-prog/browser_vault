@@ -299,7 +299,8 @@ export default function App() {
           >
             <button
               className="tree-main"
-              onClick={() => {
+              onClick={(event) => {
+                event.stopPropagation();
                 setSelectedFolder(folder.id);
                 setExpanded((current) => {
                   const next = new Set(current);
@@ -315,13 +316,14 @@ export default function App() {
             <button
               className="row-action"
               title="Rename folder"
-              onClick={() =>
+              onClick={(event) => {
+                event.stopPropagation();
                 setEditor({
                   kind: "folder",
                   item: folder,
                   parentFolderId: folder.parentFolderId,
-                })
-              }
+                });
+              }}
             >
               •••
             </button>
@@ -339,7 +341,10 @@ export default function App() {
         >
           <button
             className="tree-main"
-            onClick={() => setOpenFile(openFile === item.id ? null : item.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpenFile(openFile === item.id ? null : item.id);
+            }}
           >
             <span className="icon file-icon">▤</span>
             <span className="tree-label">{item.title}</span>
@@ -458,6 +463,7 @@ export default function App() {
       </section>
       <section
         className="explorer"
+        onClick={() => setSelectedFolder(null)}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => void dropOn(event, null)}
       >
