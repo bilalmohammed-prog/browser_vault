@@ -412,6 +412,10 @@ export default function App() {
 
     setMenuOpen(false);
   };
+  const isLinkItem = (item: CopyPastable) =>
+  item.title.startsWith("/link ") && item.content.trim().length > 0;
+
+const getDisplayTitle = (item: CopyPastable) => item.title;
 
   const renderTree = (
     parentId: string | null,
@@ -517,109 +521,138 @@ export default function App() {
         ];
       }),
 
-      ...childItems.flatMap((item) => [
-        <div
-          key={item.id}
-          className={[
-            "flex min-h-[30px] items-center rounded-[4px] border border-transparent",
-            "my-px text-[#b3b3b3] transition-colors duration-100",
-            "hover:bg-[#242424] hover:text-[#f2f2f2]",
-            openFile === item.id
-              ? "border-[#3a3a3a] bg-[#292929] text-[#f2f2f2]"
-              : "",
-          ].join(" ")}
-          style={{ paddingLeft: 28 + depth * 18 }}
-          draggable
-          onDragStart={(event) =>
-            startDrag(event, "file", item.id)
-          }
-        >
-          <button
-            className="flex h-[29px] min-w-0 flex-1 items-center gap-[7px] bg-transparent text-left text-inherit"
+      ...childItems.flatMap((item) => {
+  const linkItem = isLinkItem(item);
+  const displayTitle = getDisplayTitle(item);
+
+  return [
+    <div
+      key={item.id}
+      className={[
+        "flex min-h-[30px] items-center rounded-[4px] border border-transparent",
+        "my-px text-[#b3b3b3] transition-colors duration-100",
+        "hover:bg-[#242424] hover:text-[#f2f2f2]",
+        openFile === item.id
+          ? "border-[#3a3a3a] bg-[#292929] text-[#f2f2f2]"
+          : "",
+      ].join(" ")}
+      style={{ paddingLeft: 28 + depth * 18 }}
+      draggable
+      onDragStart={(event) =>
+        startDrag(event, "file", item.id)
+      }
+      onClick={(event) => {
+        /*
+         * Clicking the row itself opens/closes the dropdown.
+         * Clicking the title link stops propagation, so it
+         * navigates instead.
+         */
+        if (event.target === event.currentTarget) {
+          setOpenFile(
+            openFile === item.id ? null : item.id,
+          );
+        }
+      }}
+    >
+      <div
+        className="flex h-[29px] min-w-0 flex-1 items-center gap-[7px]"
+        onClick={() => {
+          setOpenFile(
+            openFile === item.id ? null : item.id,
+          );
+        }}
+      >
+        <FileText
+          className="h-3.5 w-3.5 shrink-0 text-[#999]"
+          strokeWidth={1.8}
+        />
+
+        {linkItem ? (
+          <a
+            href={item.content.trim()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
             onClick={(event) => {
               event.stopPropagation();
-
-              setOpenFile(
-                openFile === item.id ? null : item.id,
-              );
             }}
           >
-            <FileText
-  className="h-3.5 w-3.5 shrink-0 text-[#999]"
-  strokeWidth={1.8}
-/>
+            {displayTitle}
+          </a>
+        ) : (
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px]">
+            {displayTitle}
+          </span>
+        )}
+      </div>
+    </div>,
 
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px]">
-              {item.title}
-            </span>
-          </button>
-        </div>,
+    ...(openFile === item.id
+      ? [
+          <div
+            className="mx-0 mb-[5px] rounded-b-[6px] border border-[#3a3a3a] bg-[#1b1b1b] p-3"
+            key={`${item.id}-details`}
+            style={{
+              marginLeft: 28 + depth * 18,
+            }}
+          >
+            <div className="text-[11px] font-semibold text-[#f2f2f2]">
+              {displayTitle}
+            </div>
 
-        ...(openFile === item.id
-          ? [
-              <div
-                className="mx-0 mb-[5px] rounded-b-[6px] border border-[#3a3a3a] bg-[#1b1b1b] p-3"
-                key={`${item.id}-details`}
-                style={{
-                  marginLeft: 28 + depth * 18,
-                }}
+            <p className="my-[7px] mb-[11px] line-clamp-4 whitespace-pre-wrap font-mono text-[10px] leading-[1.55] text-[#a0a0a0]">
+              {item.content || "Empty copy-pastable"}
+            </p>
+
+            <div className="flex items-center gap-[5px]">
+              <button
+                className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
+                onClick={() => void copyItem(item)}
+                title="Copy content"
               >
-                <div className="text-[11px] font-semibold text-[#f2f2f2]">
-                  {item.title}
-                </div>
+                <Copy
+                  className="h-3.5 w-3.5"
+                  strokeWidth={1.8}
+                />
+                <span className="sr-only">Copy</span>
+              </button>
 
-                <p className="my-[7px] mb-[11px] line-clamp-4 whitespace-pre-wrap font-mono text-[10px] leading-[1.55] text-[#a0a0a0]">
-                  {item.content || "Empty copy-pastable"}
-                </p>
+              <button
+                className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
+                onClick={() =>
+                  setEditor({
+                    kind: "file",
+                    item,
+                    parentFolderId:
+                      item.parentFolderId,
+                  })
+                }
+                title="Edit item"
+              >
+                <Pencil
+                  className="h-3.5 w-3.5"
+                  strokeWidth={1.8}
+                />
+                <span className="sr-only">Edit</span>
+              </button>
 
-                <div className="flex items-center gap-[5px]">
-                  <button
-                    className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                    onClick={() => void copyItem(item)}
-                    title="Copy content"
-                  >
-  <Copy
-    className="h-3.5 w-3.5"
-    strokeWidth={1.8}
-  />
-  <span className="sr-only">Copy</span>
-</button>
-
-                  <button
-                    className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                    onClick={() =>
-                      setEditor({
-                        kind: "file",
-                        item,
-                        parentFolderId:
-                          item.parentFolderId,
-                      })
-                    }
-                    title="Edit item"
-                  >
-  <Pencil
-    className="h-3.5 w-3.5"
-    strokeWidth={1.8}
-  />
-  <span className="sr-only">Edit</span>
-</button>
-
-                  <button
-                    className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#4a4a4a] hover:bg-[#242424] hover:text-[#d0d0d0]"
-                    onClick={() => void removeFile(item)}
-                    title="Delete item"
-                  >
-  <Trash2
-    className="h-3.5 w-3.5"
-    strokeWidth={1.8}
-  />
-  <span className="sr-only">Delete</span>
-</button>
-                </div>
-              </div>,
-            ]
-          : []),
-      ]),
+              <button
+                className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#4a4a4a] hover:bg-[#242424] hover:text-[#d0d0d0]"
+                onClick={() => void removeFile(item)}
+                title="Delete item"
+              >
+                <Trash2
+                  className="h-3.5 w-3.5"
+                  strokeWidth={1.8}
+                />
+                <span className="sr-only">Delete</span>
+              </button>
+            </div>
+          </div>,
+        ]
+      : []),
+  ];
+}),
     ];
   };
 
