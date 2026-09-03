@@ -568,22 +568,29 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
         />
 
         {linkItem ? (
-          <a
-            href={item.content.trim()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-          >
-            {displayTitle}
-          </a>
-        ) : (
-          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px]">
-            {displayTitle}
-          </span>
-        )}
+  <a
+    href={item.content.trim()}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
+    onClick={(event) => {
+      event.stopPropagation();
+    }}
+  >
+    {displayTitle}
+  </a>
+) : (
+  <button
+    type="button"
+    className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap bg-transparent p-0 text-left text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
+    onClick={(event) => {
+      event.stopPropagation();
+      void copyItem(item);
+    }}
+  >
+    {displayTitle}
+  </button>
+)}
       </div>
     </div>,
 
