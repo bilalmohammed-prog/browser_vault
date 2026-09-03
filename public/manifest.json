@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Browser Vault",
+  "version": "1.0.0",
+  "description": "A local-first vault for reusable copy-pastables.",
+  "action": {
+    "default_title": "Browser Vault",
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "32": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
+  },
+  "permissions": [],
+  "icons": {
+    "16": "icon.svg",
+    "32": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
+  }
+}
