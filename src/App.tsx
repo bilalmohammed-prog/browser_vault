@@ -544,15 +544,16 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
       ...childItems.flatMap((item) => {
   const linkItem = isLinkItem(item);
   const displayTitle = getDisplayTitle(item);
+  const isSelected = openFile === item.id;
 
   return [
     <div
       key={item.id}
       className={[
-        "flex min-h-[30px] items-center rounded-[4px] border border-transparent",
+        "group flex min-h-[30px] items-center rounded-[4px] border border-transparent",
         "my-px text-[#b3b3b3] transition-colors duration-100",
         "hover:bg-[#242424] hover:text-[#f2f2f2]",
-        openFile === item.id
+        isSelected
           ? "border-[#3a3a3a] bg-[#292929] text-[#f2f2f2]"
           : "",
       ].join(" ")}
@@ -561,120 +562,106 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
       onDragStart={(event) =>
         startDrag(event, "file", item.id)
       }
-      onClick={(event) => {
-        /*
-         * Clicking the row itself opens/closes the dropdown.
-         * Clicking the title link stops propagation, so it
-         * navigates instead.
-         */
-        if (event.target === event.currentTarget) {
-          setOpenFile(
-            openFile === item.id ? null : item.id,
-          );
-        }
+      onClick={() => {
+        setOpenFile(isSelected ? null : item.id);
       }}
     >
-      <div
-        className="flex h-[29px] min-w-0 flex-1 items-center gap-[7px]"
-        onClick={() => {
-          setOpenFile(
-            openFile === item.id ? null : item.id,
-          );
-        }}
-      >
+      <div className="flex h-[29px] min-w-0 flex-1 items-center gap-[7px]">
         <FileText
           className="h-3.5 w-3.5 shrink-0 text-[#999]"
           strokeWidth={1.8}
         />
 
         {linkItem ? (
-  <a
-    href={item.content.trim()}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
-    onClick={(event) => {
-      event.stopPropagation();
-    }}
-  >
-    {displayTitle}
-  </a>
-) : (
-  <button
-    type="button"
-    className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap bg-transparent p-0 text-left text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
-    onClick={(event) => {
-      event.stopPropagation();
-      void copyItem(item);
-    }}
-  >
-    {displayTitle}
-  </button>
-)}
+          <a
+            href={item.content.trim()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            {displayTitle}
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap bg-transparent p-0 text-left text-[11px] text-[#b3b3b3] hover:text-[#f2f2f2] hover:underline"
+            onClick={(event) => {
+              event.stopPropagation();
+              void copyItem(item);
+            }}
+          >
+            {displayTitle}
+          </button>
+        )}
+      </div>
+
+      {/* Edit + Delete only appear on hover or selection */}
+      <div
+        className={[
+          "mr-[3px] flex shrink-0 items-center gap-[2px] transition-opacity duration-100",
+          isSelected
+            ? "opacity-100"
+            : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100",
+        ].join(" ")}
+      >
+        <button
+          type="button"
+          className="grid h-[23px] w-[25px] place-items-center rounded-[3px] bg-transparent text-[#707070] hover:bg-[#2a2a2a] hover:text-[#f2f2f2]"
+          onClick={(event) => {
+            event.stopPropagation();
+            setEditor({
+              kind: "file",
+              item,
+              parentFolderId: item.parentFolderId,
+            });
+          }}
+          title="Edit item"
+          aria-label={`Edit ${displayTitle}`}
+        >
+          <Pencil
+            className="h-3.5 w-3.5"
+            strokeWidth={1.8}
+          />
+        </button>
+
+        <button
+          type="button"
+          className="grid h-[23px] w-[25px] place-items-center rounded-[3px] bg-transparent text-[#707070] hover:bg-[#2a2a2a] hover:text-[#d0d0d0]"
+          onClick={(event) => {
+            event.stopPropagation();
+            void removeFile(item);
+          }}
+          title="Delete item"
+          aria-label={`Delete ${displayTitle}`}
+        >
+          <Trash2
+            className="h-3.5 w-3.5"
+            strokeWidth={1.8}
+          />
+        </button>
       </div>
     </div>,
 
-    ...(openFile === item.id
+    ...(isSelected
       ? [
           <div
-            className="mx-0 mb-[5px] rounded-b-[6px] border border-[#3a3a3a] bg-[#1b1b1b] p-3"
+            className="mb-[5px] w-full rounded-b-[6px] border border-[#3a3a3a] bg-[#1b1b1b] p-3"
             key={`${item.id}-details`}
             style={{
-              marginLeft: 28 + depth * 18,
-            }}
+  marginLeft: 0,
+  width: "100%",
+}}
           >
-            <div className="text-[11px] font-semibold text-[#f2f2f2]">
-              {displayTitle}
-            </div>
-
-            <p className="my-[7px] mb-[11px] line-clamp-4 whitespace-pre-wrap font-mono text-[10px] leading-[1.55] text-[#a0a0a0]">
-              {item.content || "Empty copy-pastable"}
+            <p className="m-0 whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.55] text-[#a0a0a0]">
+              {item.content
+                ? `${item.content.slice(0, 50)}${
+                    item.content.length > 50 ? "…" : ""
+                  }`
+                : "Empty copy-pastable"}
             </p>
-
-            <div className="flex items-center gap-[5px]">
-              <button
-                className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                onClick={() => void copyItem(item)}
-                title="Copy content"
-              >
-                <Copy
-                  className="h-3.5 w-3.5"
-                  strokeWidth={1.8}
-                />
-                <span className="sr-only">Copy</span>
-              </button>
-
-              <button
-                className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                onClick={() =>
-                  setEditor({
-                    kind: "file",
-                    item,
-                    parentFolderId:
-                      item.parentFolderId,
-                  })
-                }
-                title="Edit item"
-              >
-                <Pencil
-                  className="h-3.5 w-3.5"
-                  strokeWidth={1.8}
-                />
-                <span className="sr-only">Edit</span>
-              </button>
-
-              <button
-                className="relative grid h-[26px] w-7 place-items-center rounded border border-[#303030] bg-[#1e1e1e] text-[14px] text-[#999] transition-colors hover:border-[#4a4a4a] hover:bg-[#242424] hover:text-[#d0d0d0]"
-                onClick={() => void removeFile(item)}
-                title="Delete item"
-              >
-                <Trash2
-                  className="h-3.5 w-3.5"
-                  strokeWidth={1.8}
-                />
-                <span className="sr-only">Delete</span>
-              </button>
-            </div>
           </div>,
         ]
       : []),
