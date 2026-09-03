@@ -274,6 +274,8 @@ export default function App() {
       await deleteFolder(folder.id);
 
       setSelectedFolder(null);
+      setEditor(null);
+
       await refresh();
     } catch (error) {
       setNotice(
@@ -882,18 +884,7 @@ export default function App() {
                   : "FOLDER"}
               </span>
 
-              <button
-  type="button"
-  className="grid h-7 w-7 place-items-center rounded bg-transparent text-[#808080] hover:bg-[#292929] hover:text-[#f2f2f2]"
-  onClick={() => setEditor(null)}
-  title="Close"
-  aria-label="Close"
->
-  <X
-    className="h-4 w-4"
-    strokeWidth={1.8}
-  />
-</button>
+    
             </div>
 
             {editor.kind === "file" ? (
@@ -925,7 +916,7 @@ export default function App() {
                   }
                   placeholder="Start typing your reusable text..."
                   rows={9}
-                  className="mt-3 block min-h-[220px] w-full resize-y border-0 bg-transparent p-0 text-[12px] leading-[1.6] text-[#f2f2f2] outline-none placeholder:text-[#606060]"
+                  className="mt-3 block min-h-[220px] w-full resize-none scrollbar-none border-0 bg-transparent p-0 text-[12px] leading-[1.6] text-[#f2f2f2] outline-none placeholder:text-[#606060]"
                 />
               </div>
             ) : (
@@ -947,25 +938,43 @@ export default function App() {
               </label>
             )}
 
-            <div className="mt-4 flex justify-end gap-[7px]">
-              <button
-                type="button"
-                className="h-[29px] rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[10px] font-semibold text-[#b3b3b3] hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
-                onClick={() => setEditor(null)}
-              >
-                Cancel
-              </button>
+            <div className="mt-4 flex justify-between gap-[7px]">
+  {editor.kind === "folder" && editor.item ? (
+    <button
+      type="button"
+      className="flex h-[29px] items-center gap-1.5 rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[10px] font-semibold text-[#b3b3b3] hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
+      onClick={() => void removeFolder(editor.item as Folder)}
+    >
+      <Trash2
+        className="h-3.5 w-3.5"
+        strokeWidth={1.8}
+      />
+      Delete
+    </button>
+  ) : (
+    <span />
+  )}
 
-              <button
-                className="h-[29px] rounded-[5px] border border-[#3a3a3a] bg-[#292929] px-[9px] text-[10px] font-semibold text-[#f2f2f2] hover:bg-[#242424]"
-                type="submit"
-              >
-                Save{" "}
-                {editor.kind === "file"
-                  ? "snippet"
-                  : "folder"}
-              </button>
-            </div>
+  <div className="flex gap-[7px]">
+    <button
+      type="button"
+      className="h-[29px] rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[10px] font-semibold text-[#b3b3b3] hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
+      onClick={() => setEditor(null)}
+    >
+      Cancel
+    </button>
+
+    <button
+      className="h-[29px] rounded-[5px] border border-[#3a3a3a] bg-[#292929] px-[9px] text-[10px] font-semibold text-[#f2f2f2] hover:bg-[#242424]"
+      type="submit"
+    >
+      Save{" "}
+      {editor.kind === "file"
+        ? "snippet"
+        : "folder"}
+    </button>
+  </div>
+</div>
           </form>
         </div>
       )}
