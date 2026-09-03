@@ -738,11 +738,7 @@ export default function App() {
           />
 
           <kbd className="flex items-center gap-1 font-mono text-[10px] text-[#606060]">
-  <Command
-    className="h-3 w-3"
-    strokeWidth={1.8}
-  />
-  <span>K</span>
+
 </kbd>
         </label>
 
@@ -832,9 +828,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="pb-1 pt-5 text-center font-mono text-[9px] text-[#606060]">
-          Drop here for root
-        </div>
+
       </section>
 
       {/* Footer */}
@@ -912,6 +906,7 @@ export default function App() {
               <div className="w-full rounded-[7px] border border-[#303030] bg-[#181818] p-4">
                 <input
                   name="name"
+                  autoComplete="off"
                   maxLength={30}
                   autoFocus
                   defaultValue={
@@ -939,6 +934,7 @@ export default function App() {
 
                 <input
                   name="name"
+                  autoComplete="off"
                   maxLength={30}
                   autoFocus
                   defaultValue={
