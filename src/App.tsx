@@ -1105,8 +1105,8 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
           window.parent.postMessage(
             {
               type: "BROWSER_VAULT_START_DRAG",
-              clientX: event.clientX,
-              clientY: event.clientY,
+              screenX: event.screenX,
+              screenY: event.screenY,
             },
             "*",
           );
@@ -1117,13 +1117,22 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
           window.parent.postMessage(
             {
               type: "BROWSER_VAULT_DRAG_MOVE",
-              clientX: event.clientX,
-              clientY: event.clientY,
+              screenX: event.screenX,
+              screenY: event.screenY,
             },
             "*",
           );
         }}
         onPointerUp={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+
+          event.currentTarget.releasePointerCapture(event.pointerId);
+          window.parent.postMessage(
+            { type: "BROWSER_VAULT_END_DRAG" },
+            "*",
+          );
+        }}
+        onPointerCancel={(event) => {
           if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
 
           event.currentTarget.releasePointerCapture(event.pointerId);

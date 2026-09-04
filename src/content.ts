@@ -4,8 +4,8 @@ type StorageResult = {
 
 type PanelMessage =
   | { type: "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK"; value: boolean }
-  | { type: "BROWSER_VAULT_START_DRAG"; clientX: number; clientY: number }
-  | { type: "BROWSER_VAULT_DRAG_MOVE"; clientX: number; clientY: number }
+  | { type: "BROWSER_VAULT_START_DRAG"; screenX: number; screenY: number }
+  | { type: "BROWSER_VAULT_DRAG_MOVE"; screenX: number; screenY: number }
   | { type: "BROWSER_VAULT_END_DRAG" }
   | {
       type: "BROWSER_VAULT_START_RESIZE";
@@ -195,18 +195,8 @@ export {};
     }
 
     const panelMessage = message as PanelMessage;
-    const toPagePoint = (clientX: number, clientY: number) => {
-      const frameRect = frame?.getBoundingClientRect();
-
-      return {
-        clientX: clientX + (frameRect?.left ?? 0),
-        clientY: clientY + (frameRect?.top ?? 0),
-      };
-    };
-
     if (panelMessage.type === "BROWSER_VAULT_DRAG_MOVE") {
-      const point = toPagePoint(panelMessage.clientX, panelMessage.clientY);
-      movePanelFromFrame?.(point.clientX, point.clientY);
+      movePanelFromFrame?.(panelMessage.screenX, panelMessage.screenY);
       return;
     }
 
@@ -242,16 +232,14 @@ export {};
     }
 
     if (panelMessage.type === "BROWSER_VAULT_START_DRAG") {
-      const startPoint = toPagePoint(
-        panelMessage.clientX,
-        panelMessage.clientY,
-      );
-      const startX = startPoint.clientX;
-      const startY = startPoint.clientY;
+      stopMovingPanelFromFrame?.();
+
+      const startX = panelMessage.screenX;
+      const startY = panelMessage.screenY;
       const startLeft = host?.getBoundingClientRect().left ?? 0;
       const startTop = host?.getBoundingClientRect().top ?? 0;
 
-      const movePanel = (moveEvent: PointerEvent) => {
+      const movePanel = (clientX: number, clientY: number) => {
         if (!host) return;
 
         const width = host.offsetWidth;
@@ -261,29 +249,36 @@ export {};
 
         host.style.left = `${Math.min(
           maxLeft,
-          Math.max(0, startLeft + moveEvent.clientX - startX),
+          Math.max(0, startLeft + clientX - startX),
         )}px`;
         host.style.top = `${Math.min(
           maxTop,
-          Math.max(0, startTop + moveEvent.clientY - startY),
+          Math.max(0, startTop + clientY - startY),
         )}px`;
         host.style.right = "auto";
       };
 
+      const movePanelFromDocument = (moveEvent: PointerEvent) => {
+        movePanel(moveEvent.screenX, moveEvent.screenY);
+      };
+
       const stopMovingPanel = () => {
-        document.removeEventListener("pointermove", movePanel);
+        document.removeEventListener("pointermove", movePanelFromDocument);
         document.removeEventListener("pointerup", stopMovingPanel);
         document.documentElement.style.userSelect = "";
         movePanelFromFrame = null;
         stopMovingPanelFromFrame = null;
       };
 
-      movePanelFromFrame = (clientX, clientY) =>
-        movePanel({ clientX, clientY } as PointerEvent);
+      movePanelFromFrame = (screenX, screenY) =>
+        movePanel(screenX, screenY);
       stopMovingPanelFromFrame = stopMovingPanel;
       document.documentElement.style.userSelect = "none";
-      document.addEventListener("pointermove", movePanel);
+      document.addEventListener("pointermove", movePanelFromDocument);
       document.addEventListener("pointerup", stopMovingPanel, { once: true });
+      document.addEventListener("pointercancel", stopMovingPanel, {
+        once: true,
+      });
       return;
     }
 
