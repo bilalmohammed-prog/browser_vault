@@ -1090,8 +1090,8 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
 
   return (
     <main
-      className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden bg-[#121212] font-sans text-[#f2f2f2]"
-    >
+  className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden rounded-[8px] border border-[#2a2a2a] bg-[#121212] font-sans text-[#f2f2f2]"
+>
       {/* Header */}
       <header
         className="flex cursor-move items-center justify-between border-b border-[#303030] px-[18px] py-[17px]"
