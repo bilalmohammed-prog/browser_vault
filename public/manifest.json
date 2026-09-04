@@ -39,5 +39,13 @@
     "32": "icon.svg",
     "48": "icon.svg",
     "128": "icon.svg"
+  },
+  "commands": {
+  "open-browser-vault": {
+    "suggested_key": {
+      "default": "Alt+V"
+    },
+    "description": "Open Browser Vault"
   }
+}
 }

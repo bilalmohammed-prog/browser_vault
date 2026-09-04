@@ -7,6 +7,11 @@ type ChromeMessage = {
 };
 
 type ChromeApi = {
+  commands: {
+    onCommand: {
+      addListener: (listener: (command: string) => void) => void;
+    };
+  };
   action: {
     onClicked: {
       addListener: (listener: (tab: ChromeTab) => void) => void;
@@ -14,6 +19,14 @@ type ChromeApi = {
   };
   tabs: {
     sendMessage: (tabId: number, message: ChromeMessage) => Promise<unknown>;
+    query: (queryInfo: {
+      active: boolean;
+      lastFocusedWindow: boolean;
+    }) => Promise<ChromeTab[]>;
+    create: (createProperties: { url: string }) => Promise<unknown>;
+  };
+  runtime: {
+    getURL: (path: string) => string;
   };
   scripting: {
     executeScript: (details: {
@@ -60,9 +73,32 @@ const togglePanel = async (tabId: number) => {
         "[Browser Vault background] executeScript or second tabs.sendMessage failed:",
         error instanceof Error ? error.message : error,
       );
+
+      await chrome.tabs.create({ url: chrome.runtime.getURL("index.html") });
     }
   }
 };
+
+const handleCommand = (command: string, tab: ChromeTab | undefined) => {
+  if (command !== "open-browser-vault") {
+    return;
+  }
+
+  if (tab?.id === undefined) {
+    console.error("[Browser Vault background] command tab ID is undefined");
+    return;
+  }
+
+  void togglePanel(tab.id);
+};
+
+chrome.commands.onCommand.addListener((command) => {
+  console.log("[Browser Vault background] chrome.commands.onCommand fired");
+
+  void chrome.tabs
+    .query({ active: true, lastFocusedWindow: true })
+    .then((tabs) => handleCommand(command, tabs[0]));
+});
 
 chrome.action.onClicked.addListener((tab) => {
   console.log("[Browser Vault background] chrome.action.onClicked fired");
