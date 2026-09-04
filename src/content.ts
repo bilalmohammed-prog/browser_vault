@@ -136,12 +136,14 @@ export {};
 
     const resizeGrip = document.createElement("div");
     resizeGrip.setAttribute("aria-label", "Resize Browser Vault");
+
+    // resizing icon
     Object.assign(resizeGrip.style, {
       position: "absolute",
       right: "0",
       bottom: "0",
-      width: "48px",
-      height: "48px",
+      width: "24px",
+      height: "24px",
       zIndex: "1",
       cursor: "nwse-resize",
       background:

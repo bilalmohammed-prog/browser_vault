@@ -1193,12 +1193,12 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
     className="mr-1 inline-block h-3.5 w-3.5 align-[-2px]"
     strokeWidth={1.8}
   />
-  <span>New</span>
+  <span>File</span>
 </button>
 
           <div ref={menuRef} className="relative">
             <button
-              className="h-[29px] rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[13px] tracking-wider text-[#b3b3b3] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
+              className="rounded-[5px] border border-[#303030] bg-[#181818] grid h-[27px] w-[29px] place-items-center tracking-wider text-[#b3b3b3] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
               onClick={() => setMenuOpen(!menuOpen)}
               title="Vault settings"
             >
