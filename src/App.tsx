@@ -1101,6 +1101,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
             return;
           }
 
+          event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);
           window.parent.postMessage(
             {
