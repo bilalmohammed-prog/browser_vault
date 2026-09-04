@@ -9,8 +9,6 @@ import type {
 import {
   ChevronDown,
   ChevronRight,
-  Command,
-  Copy,
   Download,
   FilePlus,
   FileText,
@@ -49,6 +47,11 @@ type EditorState = {
   parentFolderId: string | null;
 };
 
+type PrioritizedCopyPastable = CopyPastable & { priority?: number };
+type PrioritizedFolder = Folder & { priority?: number };
+type DropMode = "before" | "inside" | "after";
+type DropPreview = { targetId: string; mode: DropMode };
+
 const uid = () => crypto.randomUUID();
 const timestamp = () => Date.now();
 
@@ -64,6 +67,7 @@ export default function App() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
 
   const [linkMode, setLinkMode] = useState(false);
 
@@ -222,6 +226,7 @@ export default function App() {
               id: uid(),
               name,
               parentFolderId: editor.parentFolderId,
+              priority: getNextPriority("folder", editor.parentFolderId),
               createdAt: timestamp(),
               updatedAt: timestamp(),
             };
@@ -250,6 +255,10 @@ export default function App() {
               title: name,
               content,
               parentFolderId: editor?.parentFolderId ?? null,
+              priority: getNextPriority(
+                "file",
+                editor?.parentFolderId ?? null,
+              ),
               createdAt: timestamp(),
               updatedAt: timestamp(),
             };
@@ -401,51 +410,12 @@ export default function App() {
     return true;
   };
 
-  const dropOn = async (
-    event: DragEvent,
-    parentFolderId: string | null,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const payload = event.dataTransfer.getData("text/plain");
-
-    if (!payload) return;
-
-    const [kind, id] = payload.split(":");
-
-    try {
-      if (kind === "folder") {
-        if (parentFolderId && !canDrop(id, parentFolderId)) {
-          return setNotice("A folder cannot be moved into itself.");
-        }
-
-        const folder = folderMap.get(id);
-
-        if (folder) {
-          await moveFolder(folder, parentFolderId);
-        }
-      } else {
-        const item = items.find((candidate) => candidate.id === id);
-
-        if (item) {
-          await moveCopyPastable(item, parentFolderId);
-        }
-      }
-
-      await refresh();
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Unable to move item.",
-      );
-    }
-  };
-
   const startDrag = (
     event: DragEvent,
     kind: string,
     id: string,
   ) => {
+    setDropPreview(null);
     event.dataTransfer.setData("text/plain", `${kind}:${id}`);
     event.dataTransfer.effectAllowed = "move";
   };
@@ -512,17 +482,314 @@ export default function App() {
 
 const getDisplayTitle = (item: CopyPastable) => item.title;
 
+  // Lower priority numbers appear first. Existing vaults without a
+  // priority keep their previous alphabetical order until they are reordered.
+  const getPriority = (item: { priority?: number }, fallback: number) =>
+    typeof item.priority === "number" ? item.priority : fallback;
+
+  const sortByPriority = <T extends { priority?: number }>(
+    values: T[],
+    getName: (value: T) => string,
+  ) =>
+    values
+      .map((value, index) => ({ value, index }))
+      .sort(
+        (a, b) =>
+          getPriority(a.value, a.index) - getPriority(b.value, b.index) ||
+          getName(a.value).localeCompare(getName(b.value)),
+      )
+      .map(({ value }) => value);
+
+  const getNextPriority = (
+    kind: "file" | "folder",
+    parentFolderId: string | null,
+  ) => {
+    const siblings =
+      kind === "folder"
+        ? folders.filter((folder) => folder.parentFolderId === parentFolderId)
+        : items.filter((item) => item.parentFolderId === parentFolderId);
+
+    return (
+      siblings.reduce(
+        (max, sibling, index) =>
+          Math.max(max, getPriority(sibling, index)),
+        -1,
+      ) + 1
+    );
+  };
+
+  const persistOrder = async (
+    kind: "file" | "folder",
+    orderedIds: string[],
+    moved?: CopyPastable | Folder,
+  ) => {
+    const now = timestamp();
+
+    if (kind === "folder") {
+      const byId = new Map(folders.map((folder) => [folder.id, folder]));
+
+      await Promise.all(
+        orderedIds.map((id, priority) => {
+          const folder =
+            moved?.id === id && "name" in moved ? moved : byId.get(id);
+          if (!folder) return Promise.resolve();
+
+          return updateFolder({
+            ...folder,
+            priority,
+            updatedAt: now,
+          } as PrioritizedFolder);
+        }),
+      );
+    } else {
+      const byId = new Map(items.map((item) => [item.id, item]));
+
+      await Promise.all(
+        orderedIds.map((id, priority) => {
+          const item =
+            moved?.id === id && "title" in moved ? moved : byId.get(id);
+          if (!item) return Promise.resolve();
+
+          return updateCopyPastable({
+            ...item,
+            priority,
+            updatedAt: now,
+          } as PrioritizedCopyPastable);
+        }),
+      );
+    }
+  };
+
+  const placeItem = async (
+    draggedKind: "file" | "folder",
+    draggedId: string,
+    targetKind: "file" | "folder",
+    targetId: string,
+    targetParentId: string | null,
+    mode: DropMode,
+  ) => {
+    const dragged =
+      draggedKind === "folder"
+        ? folderMap.get(draggedId)
+        : items.find((item) => item.id === draggedId);
+    if (!dragged) return;
+
+    const destinationParentId = mode === "inside" ? targetId : targetParentId;
+
+    if (
+      draggedKind === "folder" &&
+      (destinationParentId === draggedId ||
+        (destinationParentId !== null &&
+          !canDrop(draggedId, destinationParentId)))
+    ) {
+      setNotice("A folder cannot be moved into itself or its descendants.");
+      return;
+    }
+
+    if (mode === "inside" && targetKind !== "folder") return;
+    if (mode !== "inside" && draggedId === targetId) return;
+
+    const siblings =
+      draggedKind === "folder"
+        ? sortByPriority(
+            folders.filter(
+              (folder) =>
+                folder.parentFolderId === destinationParentId &&
+                folder.id !== draggedId,
+            ),
+            (folder) => folder.name,
+          )
+        : sortByPriority(
+            items.filter(
+              (item) =>
+                item.parentFolderId === destinationParentId &&
+                item.id !== draggedId,
+            ),
+            (item) => item.title,
+          );
+
+    const targetIndex = siblings.findIndex((sibling) => sibling.id === targetId);
+    const insertIndex =
+      mode === "inside"
+        ? siblings.length
+        : targetKind === draggedKind && targetIndex >= 0
+          ? mode === "after"
+            ? targetIndex + 1
+            : targetIndex
+          : mode === "after"
+            ? siblings.length
+            : 0;
+    const orderedIds = siblings.map((sibling) => sibling.id);
+    orderedIds.splice(insertIndex, 0, draggedId);
+
+    try {
+      await persistOrder(draggedKind, orderedIds, {
+        ...dragged,
+        parentFolderId: destinationParentId,
+        updatedAt: timestamp(),
+      });
+      await refresh();
+      if (mode === "inside") {
+        setExpanded((current) => new Set(current).add(targetId));
+      }
+      setNotice(mode === "inside" ? "Moved into folder" : "Priority updated");
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to update priority.",
+      );
+    }
+  };
+
+  const getDropMode = (
+    event: DragEvent,
+    targetKind: "file" | "folder",
+    targetElement: Element,
+  ): DropMode => {
+    const rect = targetElement.getBoundingClientRect();
+    const ratio = rect.height
+      ? (event.clientY - rect.top) / rect.height
+      : 0.5;
+
+    return targetKind === "folder" && ratio >= 0.35 && ratio <= 0.65
+      ? "inside"
+      : ratio < 0.5
+        ? "before"
+        : "after";
+  };
+
+  const handleRowDrop = async (
+    event: DragEvent,
+    targetKind: "file" | "folder",
+    targetId: string,
+    targetParentId: string | null,
+    targetElement: HTMLDivElement,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropPreview(null);
+
+    const payload = event.dataTransfer.getData("text/plain");
+    if (!payload) return;
+
+    const [draggedKind, draggedId] = payload.split(":");
+    if (
+      (draggedKind !== "file" && draggedKind !== "folder") ||
+      !draggedId
+    ) {
+      return;
+    }
+
+    await placeItem(
+      draggedKind,
+      draggedId,
+      targetKind,
+      targetId,
+      targetParentId,
+      getDropMode(event, targetKind, targetElement),
+    );
+  };
+
+  const handleRowDragOver = (
+    event: DragEvent,
+    targetKind: "file" | "folder",
+    targetId: string,
+  ) => {
+    event.preventDefault();
+    setDropPreview({
+      targetId,
+      mode: getDropMode(event, targetKind, event.currentTarget),
+    });
+  };
+
+  const dropIndicator = (targetId: string) => {
+    const mode = dropPreview?.targetId === targetId ? dropPreview.mode : null;
+    if (!mode) return null;
+
+    return mode === "inside" ? (
+      <span className="pointer-events-none absolute inset-0 rounded-[4px] border border-[#777] bg-[#303030]/40" />
+    ) : (
+      <span
+        className={`pointer-events-none absolute left-1 right-1 h-px bg-[#bdbdbd] shadow-[0_0_4px_rgba(255,255,255,0.45)] ${
+          mode === "before" ? "top-[-2px]" : "bottom-[-2px]"
+        }`}
+      />
+    );
+  };
+
+  const handleRootDrop = async (event: DragEvent) => {
+    event.preventDefault();
+    setDropPreview(null);
+
+    const payload = event.dataTransfer.getData("text/plain");
+    if (!payload) return;
+
+    const [kind, id] = payload.split(":");
+
+    try {
+      if (kind === "folder") {
+        const folder = folderMap.get(id);
+        if (!folder || folder.parentFolderId === null) return;
+
+        await moveFolder(folder, null);
+
+        const rootFolders = sortByPriority(
+          folders.filter(
+            (candidate) =>
+              candidate.parentFolderId === null && candidate.id !== id,
+          ),
+          (candidate) => candidate.name,
+        );
+
+        await persistOrder("folder", [
+          ...rootFolders.map((candidate) => candidate.id),
+          id,
+        ]);
+      } else if (kind === "file") {
+        const item = items.find((candidate) => candidate.id === id);
+        if (!item || item.parentFolderId === null) return;
+
+        await moveCopyPastable(item, null);
+
+        const rootItems = sortByPriority(
+          items.filter(
+            (candidate) =>
+              candidate.parentFolderId === null && candidate.id !== id,
+          ),
+          (candidate) => candidate.title,
+        );
+
+        await persistOrder("file", [
+          ...rootItems.map((candidate) => candidate.id),
+          id,
+        ]);
+      } else {
+        return;
+      }
+
+      await refresh();
+      setNotice("Moved to root");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Unable to move item.",
+      );
+    }
+  };
+
   const renderTree = (
     parentId: string | null,
     depth = 0,
   ): ReactElement[] => {
-    const childFolders = folders
-      .filter((folder) => folder.parentFolderId === parentId)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const childFolders = sortByPriority(
+      folders.filter((folder) => folder.parentFolderId === parentId),
+      (folder) => folder.name,
+    );
 
-    const childItems = items
-      .filter((item) => item.parentFolderId === parentId)
-      .sort((a, b) => a.title.localeCompare(b.title));
+    const childItems = sortByPriority(
+      items.filter((item) => item.parentFolderId === parentId),
+      (item) => item.title,
+    );
 
     return [
       ...childFolders.flatMap((folder) => {
@@ -532,11 +799,15 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
           <div
             key={folder.id}
             className={[
-              "group flex min-h-[30px] items-center rounded-[4px] border border-transparent",
+              "group relative flex min-h-[30px] items-center rounded-[4px] border border-transparent",
               "my-px text-[#b3b3b3] transition-colors duration-100",
               "hover:bg-[#242424] hover:text-[#f2f2f2]",
               selectedFolder === folder.id
                 ? "border-[#3a3a3a] bg-[#292929] text-[#f2f2f2]"
+                : "",
+              dropPreview?.targetId === folder.id &&
+                dropPreview.mode === "inside"
+                ? "bg-[#303030]"
                 : "",
             ].join(" ")}
             style={{ paddingLeft: 10 + depth * 18 }}
@@ -544,11 +815,21 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
             onDragStart={(event) =>
               startDrag(event, "folder", folder.id)
             }
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={(event) =>
+              handleRowDragOver(event, "folder", folder.id)
+            }
+            onDragEnd={() => setDropPreview(null)}
             onDrop={(event) =>
-              void dropOn(event, folder.id)
+              void handleRowDrop(
+                event,
+                "folder",
+                folder.id,
+                folder.parentFolderId,
+                event.currentTarget,
+              )
             }
           >
+            {dropIndicator(folder.id)}
             <button
               className="flex h-[29px] min-w-0 flex-1 items-center gap-[7px] bg-transparent text-left text-inherit"
               onClick={(event) => {
@@ -625,7 +906,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
     <div
       key={item.id}
       className={[
-        "group flex min-h-[30px] items-center rounded-[4px] border border-transparent",
+        "group relative flex min-h-[30px] items-center rounded-[4px] border border-transparent",
         "my-px text-[#b3b3b3] transition-colors duration-100",
         "hover:bg-[#242424] hover:text-[#f2f2f2]",
         isSelected
@@ -637,10 +918,22 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
       onDragStart={(event) =>
         startDrag(event, "file", item.id)
       }
+      onDragOver={(event) => handleRowDragOver(event, "file", item.id)}
+      onDragEnd={() => setDropPreview(null)}
+      onDrop={(event) =>
+        void handleRowDrop(
+          event,
+          "file",
+          item.id,
+          item.parentFolderId,
+          event.currentTarget,
+        )
+      }
       onClick={() => {
         setOpenFile(isSelected ? null : item.id);
       }}
     >
+      {dropIndicator(item.id)}
       <div className="flex h-[29px] min-w-0 flex-1 items-center gap-[7px]">
         <FileText
           className="h-3.5 w-3.5 shrink-0 text-[#999]"
@@ -893,7 +1186,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
         className="min-h-[350px] flex-1 overflow-y-auto px-2 pb-4 pt-[7px] [scrollbar-color:#333_#121212] [scrollbar-width:thin]"
         onClick={() => setSelectedFolder(null)}
         onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => void dropOn(event, null)}
+        onDrop={(event) => void handleRootDrop(event)}
       >
         {query ? (
           searchResults.length ? (

@@ -3,6 +3,7 @@ export type Folder = {
   name: string;
   title?: never;
   parentFolderId: string | null;
+  priority?: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -12,6 +13,7 @@ export type CopyPastable = {
   title: string;
   content: string;
   parentFolderId: string | null;
+  priority?: number;
   createdAt: number;
   updatedAt: number;
 };
