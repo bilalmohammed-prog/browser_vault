@@ -424,7 +424,7 @@ export default function App() {
       await navigator.clipboard.writeText(item.content);
       setNotice("Copied!");
     } catch {
-      setNotice("Clipboard access failed. Try again from the extension popup.");
+      setNotice("Clipboard access failed. Check your browser permissions and try again.");
     }
   };
 
@@ -1070,7 +1070,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
   };
 
   return (
-    <main className="flex min-h-[560px] max-h-[680px] w-[440px] flex-col overflow-hidden bg-[#121212] font-sans text-[#f2f2f2]">
+    <main className="flex h-full min-h-[560px] max-h-[680px] w-[440px] flex-col overflow-hidden bg-[#121212] font-sans text-[#f2f2f2]">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-[#303030] px-[18px] py-[17px]">
         <div className="flex items-center gap-2.5">

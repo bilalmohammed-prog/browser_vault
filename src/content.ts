@@ -57,7 +57,6 @@ export {};
 
   const setVisible = (nextVisible: boolean) => {
     visible = nextVisible;
-    console.log("[Browser Vault content] toggling visibility:", visible);
 
     if (host) {
       host.style.display = visible ? "block" : "none";
@@ -77,13 +76,11 @@ export {};
   const createPanel = () => {
     const existing = document.getElementById(HOST_ID);
     if (existing) {
-      console.log("[Browser Vault content] reusing floating host");
       host = existing as HTMLDivElement;
       frame = host.querySelector("iframe");
       return;
     }
 
-    console.log("[Browser Vault content] creating floating host");
     host = document.createElement("div");
     host.id = HOST_ID;
 
@@ -102,9 +99,9 @@ export {};
       pointerEvents: "auto",
     });
 
-    console.log("[Browser Vault content] creating iframe");
     frame = document.createElement("iframe");
     frame.title = "Browser Vault";
+    frame.allow = "clipboard-write";
     frame.src = chrome.runtime.getURL("index.html");
     frame.setAttribute("frameborder", "0");
     frame.setAttribute("scrolling", "no");
@@ -184,11 +181,9 @@ export {};
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === "BROWSER_VAULT_TOGGLE") {
-      console.log("[Browser Vault content] received BROWSER_VAULT_TOGGLE");
       togglePanel();
     }
   });
 
-  console.log("[Browser Vault content] initialized");
   void loadPreference();
 })();

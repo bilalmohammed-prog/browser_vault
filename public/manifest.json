@@ -15,7 +15,8 @@
   "permissions": [
     "storage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "clipboardWrite"
   ],
   "content_scripts": [
     {
