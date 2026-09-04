@@ -9,7 +9,9 @@ html,
 body,
 #root {
   height: 100%;
+  width: 100%;
   background: #121212;
+  overflow: hidden;
 }
 
 * {
@@ -18,5 +20,5 @@ body,
 
 body {
   margin: 0;
-  min-width: 380px;
+  min-width: 0;
 }

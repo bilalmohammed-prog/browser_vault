@@ -1089,9 +1089,50 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
   };
 
   return (
-    <main className="flex h-full min-h-[560px] max-h-[680px] w-[440px] flex-col overflow-hidden bg-[#121212] font-sans text-[#f2f2f2]">
+    <main
+      className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden bg-[#121212] font-sans text-[#f2f2f2]"
+    >
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-[#303030] px-[18px] py-[17px]">
+      <header
+        className="flex cursor-move items-center justify-between border-b border-[#303030] px-[18px] py-[17px]"
+        onPointerDown={(event) => {
+          const target = event.target as HTMLElement;
+          if (target.closest("button, input, textarea, select, a, label")) {
+            return;
+          }
+
+          event.currentTarget.setPointerCapture(event.pointerId);
+          window.parent.postMessage(
+            {
+              type: "BROWSER_VAULT_START_DRAG",
+              clientX: event.clientX,
+              clientY: event.clientY,
+            },
+            "*",
+          );
+        }}
+        onPointerMove={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+
+          window.parent.postMessage(
+            {
+              type: "BROWSER_VAULT_DRAG_MOVE",
+              clientX: event.clientX,
+              clientY: event.clientY,
+            },
+            "*",
+          );
+        }}
+        onPointerUp={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+
+          event.currentTarget.releasePointerCapture(event.pointerId);
+          window.parent.postMessage(
+            { type: "BROWSER_VAULT_END_DRAG" },
+            "*",
+          );
+        }}
+      >
         <div className="flex items-center gap-2.5">
           <span className="grid h-7 w-7 place-items-center rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] text-[#f2f2f2]">
   <ShieldCheck
@@ -1264,7 +1305,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
 
       {/* Explorer */}
       <section
-        className="min-h-[350px] flex-1 overflow-y-auto px-2 pb-4 pt-[7px] [scrollbar-color:#333_#121212] [scrollbar-width:thin]"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-2 pb-4 pt-[7px] [scrollbar-color:#333_#121212] [scrollbar-width:thin]"
         onClick={() => setSelectedFolder(null)}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => void handleRootDrop(event)}
@@ -1312,7 +1353,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
               </div>
             ))
           ) : (
-            <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-[#b3b3b3]">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center text-[#b3b3b3]">
               <span className="mb-[13px] grid h-10 w-10 place-items-center rounded-lg border border-[#303030] bg-[#181818] text-[#999]">
   <Search
     className="h-5 w-5"
@@ -1332,7 +1373,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
         ) : folders.length || items.length ? (
           renderTree(null)
         ) : (
-          <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-[#b3b3b3]">
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center text-[#b3b3b3]">
             <span className="mb-[13px] grid h-10 w-10 place-items-center rounded-lg border border-[#303030] bg-[#181818] text-[#999]">
   <ShieldCheck
     className="h-5 w-5"
@@ -1391,7 +1432,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
           }}
         >
           <form
-            className="w-[380px] rounded-[8px] border border-[#3a3a3a] bg-[#1e1e1e] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
+            className="max-h-full w-full max-w-[380px] overflow-y-auto rounded-[8px] border border-[#3a3a3a] bg-[#1e1e1e] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
             onSubmit={(event) =>
               void submitEditor(event)
             }

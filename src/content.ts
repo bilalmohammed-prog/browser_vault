@@ -4,6 +4,14 @@ type StorageResult = {
 
 type PanelMessage =
   | { type: "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK"; value: boolean }
+  | { type: "BROWSER_VAULT_START_DRAG"; clientX: number; clientY: number }
+  | { type: "BROWSER_VAULT_DRAG_MOVE"; clientX: number; clientY: number }
+  | { type: "BROWSER_VAULT_END_DRAG" }
+  | {
+      type: "BROWSER_VAULT_START_RESIZE";
+      clientX: number;
+      clientY: number;
+    }
   | { type: "BROWSER_VAULT_REQUEST_CLOSE_ON_OUTSIDE_CLICK" }
   | { type: "BROWSER_VAULT_SET_CLOSE_ON_OUTSIDE_CLICK"; value: unknown }
   | { type: "BROWSER_VAULT_TOGGLE" };
@@ -41,6 +49,9 @@ export {};
   let closeOnOutsideClick = true;
   let preferenceLoad: Promise<void> | null = null;
   let toggleQueue = Promise.resolve();
+  let movePanelFromFrame: ((clientX: number, clientY: number) => void) | null =
+    null;
+  let stopMovingPanelFromFrame: (() => void) | null = null;
 
   const loadPreference = () => {
     if (preferenceLoad) return preferenceLoad;
@@ -97,6 +108,13 @@ export {};
       border: "0",
       background: "transparent",
       pointerEvents: "auto",
+      overflow: "hidden",
+      resize: "none",
+      minWidth: "300px",
+      minHeight: "360px",
+      maxWidth: "calc(100vw - 32px)",
+      maxHeight: "calc(100vh - 32px)",
+      boxSizing: "border-box",
     });
 
     frame = document.createElement("iframe");
@@ -116,7 +134,37 @@ export {};
       background: "transparent",
     });
 
+    const resizeGrip = document.createElement("div");
+    resizeGrip.setAttribute("aria-label", "Resize Browser Vault");
+    Object.assign(resizeGrip.style, {
+      position: "absolute",
+      right: "0",
+      bottom: "0",
+      width: "48px",
+      height: "48px",
+      zIndex: "1",
+      cursor: "nwse-resize",
+      background:
+        "linear-gradient(135deg, transparent 0 57%, rgba(255,255,255,0.18) 58% 61%, transparent 62% 68%, rgba(255,255,255,0.32) 69% 72%, transparent 73%)",
+      touchAction: "none",
+    });
+    resizeGrip.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resizeGrip.setPointerCapture(event.pointerId);
+
+      window.postMessage(
+        {
+          type: "BROWSER_VAULT_START_RESIZE",
+          clientX: event.clientX,
+          clientY: event.clientY,
+        },
+        "*",
+      );
+    });
+
     host.appendChild(frame);
+    host.appendChild(resizeGrip);
     document.documentElement.appendChild(host);
 
   };
@@ -130,15 +178,42 @@ export {};
   };
 
   window.addEventListener("message", (event) => {
-    if (!frame || event.source !== frame.contentWindow) return;
-
     const message: unknown = event.data;
+    const resizeFromGrip =
+      event.source === window &&
+      message &&
+      typeof message === "object" &&
+      "type" in message &&
+      message.type === "BROWSER_VAULT_START_RESIZE";
+
+    if (!frame || (event.source !== frame.contentWindow && !resizeFromGrip)) {
+      return;
+    }
 
     if (!message || typeof message !== "object" || !("type" in message)) {
       return;
     }
 
     const panelMessage = message as PanelMessage;
+    const toPagePoint = (clientX: number, clientY: number) => {
+      const frameRect = frame?.getBoundingClientRect();
+
+      return {
+        clientX: clientX + (frameRect?.left ?? 0),
+        clientY: clientY + (frameRect?.top ?? 0),
+      };
+    };
+
+    if (panelMessage.type === "BROWSER_VAULT_DRAG_MOVE") {
+      const point = toPagePoint(panelMessage.clientX, panelMessage.clientY);
+      movePanelFromFrame?.(point.clientX, point.clientY);
+      return;
+    }
+
+    if (panelMessage.type === "BROWSER_VAULT_END_DRAG") {
+      stopMovingPanelFromFrame?.();
+      return;
+    }
 
     if (
       panelMessage.type ===
@@ -163,6 +238,87 @@ export {};
       chrome.storage.local.set({
         closeOnOutsideClick,
       });
+      return;
+    }
+
+    if (panelMessage.type === "BROWSER_VAULT_START_DRAG") {
+      const startPoint = toPagePoint(
+        panelMessage.clientX,
+        panelMessage.clientY,
+      );
+      const startX = startPoint.clientX;
+      const startY = startPoint.clientY;
+      const startLeft = host?.getBoundingClientRect().left ?? 0;
+      const startTop = host?.getBoundingClientRect().top ?? 0;
+
+      const movePanel = (moveEvent: PointerEvent) => {
+        if (!host) return;
+
+        const width = host.offsetWidth;
+        const height = host.offsetHeight;
+        const maxLeft = Math.max(0, window.innerWidth - width);
+        const maxTop = Math.max(0, window.innerHeight - height);
+
+        host.style.left = `${Math.min(
+          maxLeft,
+          Math.max(0, startLeft + moveEvent.clientX - startX),
+        )}px`;
+        host.style.top = `${Math.min(
+          maxTop,
+          Math.max(0, startTop + moveEvent.clientY - startY),
+        )}px`;
+        host.style.right = "auto";
+      };
+
+      const stopMovingPanel = () => {
+        document.removeEventListener("pointermove", movePanel);
+        document.removeEventListener("pointerup", stopMovingPanel);
+        document.documentElement.style.userSelect = "";
+        movePanelFromFrame = null;
+        stopMovingPanelFromFrame = null;
+      };
+
+      movePanelFromFrame = (clientX, clientY) =>
+        movePanel({ clientX, clientY } as PointerEvent);
+      stopMovingPanelFromFrame = stopMovingPanel;
+      document.documentElement.style.userSelect = "none";
+      document.addEventListener("pointermove", movePanel);
+      document.addEventListener("pointerup", stopMovingPanel, { once: true });
+      return;
+    }
+
+    if (panelMessage.type === "BROWSER_VAULT_START_RESIZE") {
+      if (!host) return;
+
+      const startX = panelMessage.clientX;
+      const startY = panelMessage.clientY;
+      const startWidth = host.offsetWidth;
+      const startHeight = host.offsetHeight;
+      const maxWidth = Math.max(300, window.innerWidth - 32);
+      const maxHeight = Math.max(360, window.innerHeight - 32);
+
+      const resizePanel = (moveEvent: PointerEvent) => {
+        if (!host) return;
+
+        host.style.width = `${Math.min(
+          maxWidth,
+          Math.max(300, startWidth + moveEvent.clientX - startX),
+        )}px`;
+        host.style.height = `${Math.min(
+          maxHeight,
+          Math.max(360, startHeight + moveEvent.clientY - startY),
+        )}px`;
+      };
+
+      const stopResizingPanel = () => {
+        document.removeEventListener("pointermove", resizePanel);
+        document.removeEventListener("pointerup", stopResizingPanel);
+        document.documentElement.style.userSelect = "";
+      };
+
+      document.documentElement.style.userSelect = "none";
+      document.addEventListener("pointermove", resizePanel);
+      document.addEventListener("pointerup", stopResizingPanel, { once: true });
     }
   });
 
