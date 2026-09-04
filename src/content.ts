@@ -1,5 +1,11 @@
 type StorageResult = {
   closeOnOutsideClick?: unknown;
+  vaultPosition?: unknown;
+};
+
+type VaultPosition = {
+  x: number;
+  y: number;
 };
 
 type PanelMessage =
@@ -31,6 +37,14 @@ type ChromeApi = {
       ) => void;
       set: (values: StorageResult) => void;
     };
+    onChanged: {
+      addListener: (
+        listener: (
+          changes: Record<string, { newValue?: unknown }>,
+          areaName: string,
+        ) => void,
+      ) => void;
+    };
   };
 };
 
@@ -47,20 +61,67 @@ export {};
   let frame: HTMLIFrameElement | null = null;
   let visible = false;
   let closeOnOutsideClick = true;
+  let vaultPosition: VaultPosition | null = null;
   let preferenceLoad: Promise<void> | null = null;
   let toggleQueue = Promise.resolve();
   let movePanelFromFrame: ((clientX: number, clientY: number) => void) | null =
     null;
   let stopMovingPanelFromFrame: (() => void) | null = null;
 
+  const isVaultPosition = (value: unknown): value is VaultPosition =>
+    typeof value === "object" &&
+    value !== null &&
+    "x" in value &&
+    "y" in value &&
+    typeof value.x === "number" &&
+    Number.isFinite(value.x) &&
+    typeof value.y === "number" &&
+    Number.isFinite(value.y);
+
+  const clampPosition = (position: VaultPosition): VaultPosition => {
+    if (!host) return position;
+
+    const maxLeft = Math.max(0, window.innerWidth - host.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - host.offsetHeight);
+
+    return {
+      x: Math.min(maxLeft, Math.max(0, position.x)),
+      y: Math.min(maxTop, Math.max(0, position.y)),
+    };
+  };
+
+  const applyPosition = (position: VaultPosition) => {
+    if (!host) return;
+
+    const clampedPosition = clampPosition(position);
+    host.style.left = `${clampedPosition.x}px`;
+    host.style.top = `${clampedPosition.y}px`;
+    host.style.right = "auto";
+  };
+
+  const savePosition = () => {
+    if (!host) return;
+
+    const rect = host.getBoundingClientRect();
+    const position = clampPosition({ x: rect.left, y: rect.top });
+    vaultPosition = position;
+    chrome.storage.local.set({ vaultPosition: position });
+  };
+
   const loadPreference = () => {
     if (preferenceLoad) return preferenceLoad;
 
     preferenceLoad = new Promise((resolve) => {
-      chrome.storage.local.get({ closeOnOutsideClick: true }, (result) => {
-        closeOnOutsideClick = Boolean(result.closeOnOutsideClick);
-        resolve();
-      });
+      chrome.storage.local.get(
+        { closeOnOutsideClick: true, vaultPosition: null },
+        (result) => {
+          closeOnOutsideClick = Boolean(result.closeOnOutsideClick);
+          if (isVaultPosition(result.vaultPosition)) {
+            vaultPosition = result.vaultPosition;
+          }
+          resolve();
+        },
+      );
     });
 
     return preferenceLoad;
@@ -89,6 +150,7 @@ export {};
     if (existing) {
       host = existing as HTMLDivElement;
       frame = host.querySelector("iframe");
+      if (vaultPosition) applyPosition(vaultPosition);
       return;
     }
 
@@ -169,6 +231,8 @@ export {};
     host.appendChild(frame);
     host.appendChild(resizeGrip);
     document.documentElement.appendChild(host);
+
+    if (vaultPosition) applyPosition(vaultPosition);
 
   };
 
@@ -266,9 +330,13 @@ export {};
       };
 
       const stopMovingPanel = () => {
+        if (!movePanelFromFrame && !stopMovingPanelFromFrame) return;
+
         document.removeEventListener("pointermove", movePanelFromDocument);
         document.removeEventListener("pointerup", stopMovingPanel);
+        document.removeEventListener("pointercancel", stopMovingPanel);
         document.documentElement.style.userSelect = "";
+        savePosition();
         movePanelFromFrame = null;
         stopMovingPanelFromFrame = null;
       };
@@ -337,6 +405,18 @@ export {};
     if (message.type === "BROWSER_VAULT_TOGGLE") {
       togglePanel();
     }
+  });
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (
+      areaName !== "local" ||
+      !isVaultPosition(changes.vaultPosition?.newValue)
+    ) {
+      return;
+    }
+
+    vaultPosition = changes.vaultPosition.newValue;
+    if (host) applyPosition(vaultPosition);
   });
 
   void loadPreference();
