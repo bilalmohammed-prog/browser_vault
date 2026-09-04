@@ -1,0 +1,319 @@
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -67,6 +67,7 @@
+   const [editor, setEditor] = useState<EditorState | null>(null);
+   const [notice, setNotice] = useState("");
+   const [menuOpen, setMenuOpen] = useState(false);
++  const [closeOnOutsideClick, setCloseOnOutsideClick] = useState(true);
+   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
+ 
+   const [linkMode, setLinkMode] = useState(false);
+@@ -100,6 +101,36 @@
+ 
+     return () => window.clearTimeout(timer);
+   }, [notice]);
++
++  useEffect(() => {
++    const handleMessage = (event: MessageEvent) => {
++      if (
++        event.data?.type ===
++        "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK"
++      ) {
++        setCloseOnOutsideClick(Boolean(event.data.value));
++      }
++    };
++
++    window.addEventListener("message", handleMessage);
++    window.parent.postMessage(
++      { type: "BROWSER_VAULT_REQUEST_CLOSE_ON_OUTSIDE_CLICK" },
++      "*",
++    );
++
++    return () => window.removeEventListener("message", handleMessage);
++  }, []);
++
++  const updateCloseOnOutsideClick = (value: boolean) => {
++    setCloseOnOutsideClick(value);
++    window.parent.postMessage(
++      {
++        type: "BROWSER_VAULT_SET_CLOSE_ON_OUTSIDE_CLICK",
++        value,
++      },
++      "*",
++    );
++  };
+ 
+   useEffect(() => {
+   if (editor?.kind === "file") {
+@@ -1109,7 +1140,38 @@
+ </button>
+ 
+             {menuOpen && (
+-              <div className="absolute right-0 top-[34px] z-10 w-[155px] rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
++              <div className="absolute right-0 top-[34px] z-10 w-[205px] rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
++                <button
++                  type="button"
++                  className="flex w-full items-center justify-between gap-2 rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
++                  onClick={() =>
++                    updateCloseOnOutsideClick(!closeOnOutsideClick)
++                  }
++                  aria-pressed={closeOnOutsideClick}
++                  title="Toggle whether clicking outside Browser Vault closes it"
++                >
++                  <span>Close on outside click</span>
++
++                  <span
++                    className={[
++                      "relative h-[16px] w-[29px] shrink-0 rounded-full border transition-colors duration-150",
++                      closeOnOutsideClick
++                        ? "border-[#4a4a4a] bg-[#3a3a3a]"
++                        : "border-[#303030] bg-[#181818]",
++                    ].join(" ")}
++                    aria-hidden="true"
++                  >
++                    <span
++                      className={[
++                        "absolute top-[2px] h-[10px] w-[10px] rounded-full bg-[#d0d0d0] transition-transform duration-150",
++                        closeOnOutsideClick
++                          ? "translate-x-[15px]"
++                          : "translate-x-[2px]",
++                      ].join(" ")}
++                    />
++                  </span>
++                </button>
++
+                 <button
+   className="flex w-full items-center gap-2 rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
+   onClick={() => void downloadExport()}
+--- a/public/manifest.json
++++ b/public/manifest.json
+@@ -5,7 +5,6 @@
+   "description": "A local-first vault for reusable copy-pastables.",
+   "action": {
+     "default_title": "Browser Vault",
+-    "default_popup": "index.html",
+     "default_icon": {
+       "16": "icon.svg",
+       "32": "icon.svg",
+@@ -13,7 +12,25 @@
+       "128": "icon.svg"
+     }
+   },
+-  "permissions": [],
++  "permissions": [
++    "storage"
++  ],
++  "content_scripts": [
++    {
++      "matches": ["<all_urls>"],
++      "js": ["content.js"],
++      "run_at": "document_idle"
++    }
++  ],
++  "web_accessible_resources": [
++    {
++      "resources": ["index.html", "assets/*"],
++      "matches": ["<all_urls>"]
++    }
++  ],
++  "background": {
++    "service_worker": "background.js"
++  },
+   "icons": {
+     "16": "icon.svg",
+     "32": "icon.svg",
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -1,14 +1,21 @@
+-import { defineConfig } from 'vite'
+-import react from '@vitejs/plugin-react'
++import { defineConfig } from "vite";
++import react from "@vitejs/plugin-react";
+ import tailwindcss from "@tailwindcss/vite";
+ 
+ export default defineConfig({
+   plugins: [react(), tailwindcss()],
+   build: {
+-    outDir: 'dist',
++    outDir: "dist",
+     emptyOutDir: true,
+     rollupOptions: {
+-      input: 'index.html'
+-    }
+-  }
+-})
++      input: {
++        index: "index.html",
++        content: "src/content.ts",
++        background: "src/background.ts",
++      },
++      output: {
++        entryFileNames: "[name].js",
++      },
++    },
++  },
++});
+--- /dev/null
++++ b/src/content.ts
+@@ -0,0 +1,147 @@
++(() => {
++  const HOST_ID = "browser-vault-host";
++  const PANEL_WIDTH = 440;
++  const PANEL_HEIGHT = 680;
++
++  let host: HTMLDivElement | null = null;
++  let frame: HTMLIFrameElement | null = null;
++  let visible = false;
++  let closeOnOutsideClick = true;
++  const chromeApi = (globalThis as any).chrome;
++
++  const setVisible = (nextVisible: boolean) => {
++    visible = nextVisible;
++
++    if (host) {
++      host.style.display = visible ? "block" : "none";
++    }
++
++    if (visible) {
++      frame?.contentWindow?.postMessage(
++        {
++          type: "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK",
++          value: closeOnOutsideClick,
++        },
++        "*",
++      );
++    }
++  };
++
++  const createPanel = () => {
++    const existing = document.getElementById(HOST_ID);
++    if (existing) {
++      host = existing as HTMLDivElement;
++      frame = host.querySelector("iframe");
++      return;
++    }
++
++    host = document.createElement("div");
++    host.id = HOST_ID;
++
++    Object.assign(host.style, {
++      position: "fixed",
++      top: "16px",
++      right: "16px",
++      width: `${PANEL_WIDTH}px`,
++      height: `${PANEL_HEIGHT}px`,
++      zIndex: "2147483647",
++      display: "none",
++      margin: "0",
++      padding: "0",
++      border: "0",
++      background: "transparent",
++      pointerEvents: "auto",
++    });
++
++    frame = document.createElement("iframe");
++    frame.title = "Browser Vault";
++    frame.src = chromeApi.runtime.getURL("index.html");
++    frame.setAttribute("frameborder", "0");
++    frame.setAttribute("scrolling", "no");
++
++    Object.assign(frame.style, {
++      display: "block",
++      width: "100%",
++      height: "100%",
++      margin: "0",
++      padding: "0",
++      border: "0",
++      background: "transparent",
++    });
++
++    host.appendChild(frame);
++    document.documentElement.appendChild(host);
++
++    chromeApi.storage.local.get(
++      { closeOnOutsideClick: true },
++      (result) => {
++        closeOnOutsideClick = Boolean(result.closeOnOutsideClick);
++
++        if (visible) {
++          frame?.contentWindow?.postMessage(
++            {
++              type: "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK",
++              value: closeOnOutsideClick,
++            },
++            "*",
++          );
++        }
++      },
++    );
++  };
++
++  const togglePanel = () => {
++    createPanel();
++    setVisible(!visible);
++  };
++
++  window.addEventListener("message", (event) => {
++    if (!frame || event.source !== frame.contentWindow) return;
++
++    const message = event.data;
++
++    if (
++      message?.type ===
++      "BROWSER_VAULT_REQUEST_CLOSE_ON_OUTSIDE_CLICK"
++    ) {
++      frame.contentWindow.postMessage(
++        {
++          type: "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK",
++          value: closeOnOutsideClick,
++        },
++        "*",
++      );
++      return;
++    }
++
++    if (
++      message?.type ===
++      "BROWSER_VAULT_SET_CLOSE_ON_OUTSIDE_CLICK"
++    ) {
++      closeOnOutsideClick = Boolean(message.value);
++
++      chromeApi.storage.local.set({
++        closeOnOutsideClick,
++      });
++    }
++  });
++
++  document.addEventListener(
++    "mousedown",
++    (event) => {
++      if (!visible || !closeOnOutsideClick || !host) return;
++
++      const target = event.target;
++      if (target instanceof Node && host.contains(target)) return;
++
++      setVisible(false);
++    },
++    true,
++  );
++
++  chromeApi.runtime.onMessage.addListener((message) => {
++    if (message?.type === "BROWSER_VAULT_TOGGLE") {
++      togglePanel();
++    }
++  });
++})();
+--- /dev/null
++++ b/src/background.ts
+@@ -0,0 +1,11 @@
++const chromeApi = (globalThis as any).chrome;
++
++chromeApi.action.onClicked.addListener((tab) => {
++  if (tab.id === undefined) return;
++
++  chromeApi.tabs.sendMessage(tab.id, {
++    type: "BROWSER_VAULT_TOGGLE",
++  }).catch(() => {
++    // Some browser-internal pages do not allow content scripts.
++  });
++});

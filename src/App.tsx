@@ -67,6 +67,7 @@ export default function App() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [closeOnOutsideClick, setCloseOnOutsideClick] = useState(true);
   const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
 
   const [linkMode, setLinkMode] = useState(false);
@@ -100,6 +101,36 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (
+        event.data?.type ===
+        "BROWSER_VAULT_CLOSE_ON_OUTSIDE_CLICK"
+      ) {
+        setCloseOnOutsideClick(Boolean(event.data.value));
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.parent.postMessage(
+      { type: "BROWSER_VAULT_REQUEST_CLOSE_ON_OUTSIDE_CLICK" },
+      "*",
+    );
+
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const updateCloseOnOutsideClick = (value: boolean) => {
+    setCloseOnOutsideClick(value);
+    window.parent.postMessage(
+      {
+        type: "BROWSER_VAULT_SET_CLOSE_ON_OUTSIDE_CLICK",
+        value,
+      },
+      "*",
+    );
+  };
 
   useEffect(() => {
   if (editor?.kind === "file") {
@@ -1109,7 +1140,38 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
 </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-[34px] z-10 w-[155px] rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+              <div className="absolute right-0 top-[34px] z-10 w-[205px] rounded-[6px] border border-[#3a3a3a] bg-[#1e1e1e] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
+                  onClick={() =>
+                    updateCloseOnOutsideClick(!closeOnOutsideClick)
+                  }
+                  aria-pressed={closeOnOutsideClick}
+                  title="Toggle whether clicking outside Browser Vault closes it"
+                >
+                  <span>Close on outside click</span>
+
+                  <span
+                    className={[
+                      "relative h-[16px] w-[29px] shrink-0 rounded-full border transition-colors duration-150",
+                      closeOnOutsideClick
+                        ? "border-[#4a4a4a] bg-[#3a3a3a]"
+                        : "border-[#303030] bg-[#181818]",
+                    ].join(" ")}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className={[
+                        "absolute top-[2px] h-[10px] w-[10px] rounded-full bg-[#d0d0d0] transition-transform duration-150",
+                        closeOnOutsideClick
+                          ? "translate-x-[15px]"
+                          : "translate-x-[2px]",
+                      ].join(" ")}
+                    />
+                  </span>
+                </button>
+
                 <button
   className="flex w-full items-center gap-2 rounded px-[9px] py-2 text-left text-[10px] text-[#b3b3b3] hover:bg-[#242424] hover:text-[#f2f2f2]"
   onClick={() => void downloadExport()}

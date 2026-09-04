@@ -5,6 +5,7 @@ browser_vault/
 ├── automation
 │   └── generate_tree.py
 ├── chatgpt_patches
+│   └── browser-vault-floating-panel.patch
 ├── public
 │   ├── icon.svg
 │   └── manifest.json
@@ -13,6 +14,8 @@ browser_vault/
 │   │   ├── db.ts
 │   │   └── vault.ts
 │   ├── App.tsx
+│   ├── background.ts
+│   ├── content.ts
 │   ├── main.tsx
 │   ├── styles.css
 │   ├── types.ts
