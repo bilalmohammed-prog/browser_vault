@@ -1,11 +1,17 @@
 type StorageResult = {
   closeOnOutsideClick?: unknown;
   vaultPosition?: unknown;
+  vaultSize?: unknown;
 };
 
 type VaultPosition = {
   x: number;
   y: number;
+};
+
+type VaultSize = {
+  width: number;
+  height: number;
 };
 
 type PanelMessage =
@@ -62,6 +68,7 @@ export {};
   let visible = false;
   let closeOnOutsideClick = true;
   let vaultPosition: VaultPosition | null = null;
+  let vaultSize: VaultSize | null = null;
   let preferenceLoad: Promise<void> | null = null;
   let toggleQueue = Promise.resolve();
   let movePanelFromFrame: ((clientX: number, clientY: number) => void) | null =
@@ -77,6 +84,35 @@ export {};
     Number.isFinite(value.x) &&
     typeof value.y === "number" &&
     Number.isFinite(value.y);
+
+  const isVaultSize = (value: unknown): value is VaultSize =>
+    typeof value === "object" &&
+    value !== null &&
+    "width" in value &&
+    "height" in value &&
+    typeof value.width === "number" &&
+    Number.isFinite(value.width) &&
+    typeof value.height === "number" &&
+    Number.isFinite(value.height);
+
+  const clampSize = (size: VaultSize): VaultSize => ({
+    width: Math.min(
+      Math.max(300, window.innerWidth - 32),
+      Math.max(300, size.width),
+    ),
+    height: Math.min(
+      Math.max(360, window.innerHeight - 32),
+      Math.max(360, size.height),
+    ),
+  });
+
+  const applySize = (size: VaultSize) => {
+    if (!host) return;
+
+    const clampedSize = clampSize(size);
+    host.style.width = `${clampedSize.width}px`;
+    host.style.height = `${clampedSize.height}px`;
+  };
 
   const clampPosition = (position: VaultPosition): VaultPosition => {
     if (!host) return position;
@@ -108,16 +144,34 @@ export {};
     chrome.storage.local.set({ vaultPosition: position });
   };
 
+  const saveSize = () => {
+    if (!host) return;
+
+    const size = clampSize({
+      width: host.offsetWidth,
+      height: host.offsetHeight,
+    });
+    vaultSize = size;
+    chrome.storage.local.set({ vaultSize: size });
+  };
+
   const loadPreference = () => {
     if (preferenceLoad) return preferenceLoad;
 
     preferenceLoad = new Promise((resolve) => {
       chrome.storage.local.get(
-        { closeOnOutsideClick: true, vaultPosition: null },
+        {
+          closeOnOutsideClick: true,
+          vaultPosition: null,
+          vaultSize: null,
+        },
         (result) => {
           closeOnOutsideClick = Boolean(result.closeOnOutsideClick);
           if (isVaultPosition(result.vaultPosition)) {
             vaultPosition = result.vaultPosition;
+          }
+          if (isVaultSize(result.vaultSize)) {
+            vaultSize = result.vaultSize;
           }
           resolve();
         },
@@ -150,6 +204,7 @@ export {};
     if (existing) {
       host = existing as HTMLDivElement;
       frame = host.querySelector("iframe");
+      if (vaultSize) applySize(vaultSize);
       if (vaultPosition) applyPosition(vaultPosition);
       return;
     }
@@ -232,6 +287,7 @@ export {};
     host.appendChild(resizeGrip);
     document.documentElement.appendChild(host);
 
+    if (vaultSize) applySize(vaultSize);
     if (vaultPosition) applyPosition(vaultPosition);
 
   };
@@ -380,6 +436,7 @@ export {};
         document.removeEventListener("pointermove", resizePanel);
         document.removeEventListener("pointerup", stopResizingPanel);
         document.documentElement.style.userSelect = "";
+        saveSize();
       };
 
       document.documentElement.style.userSelect = "none";
@@ -408,15 +465,20 @@ export {};
   });
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (
-      areaName !== "local" ||
-      !isVaultPosition(changes.vaultPosition?.newValue)
-    ) {
-      return;
+    if (areaName !== "local") return;
+
+    if (isVaultPosition(changes.vaultPosition?.newValue)) {
+      vaultPosition = changes.vaultPosition.newValue;
     }
 
-    vaultPosition = changes.vaultPosition.newValue;
-    if (host) applyPosition(vaultPosition);
+    if (isVaultSize(changes.vaultSize?.newValue)) {
+      vaultSize = changes.vaultSize.newValue;
+      if (host) {
+        applySize(vaultSize);
+      }
+    }
+
+    if (host && vaultPosition) applyPosition(vaultPosition);
   });
 
   void loadPreference();
