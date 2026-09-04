@@ -73,6 +73,7 @@ export default function App() {
   const [linkMode, setLinkMode] = useState(false);
 
   const importInput = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const refresh = async () => {
     try {
@@ -120,6 +121,24 @@ export default function App() {
 
     return () => window.removeEventListener("message", handleMessage);
   }, []);
+  useEffect(() => {
+  if (!menuOpen) return;
+
+  const handleOutsideClick = (event: MouseEvent) => {
+    if (
+      menuRef.current &&
+      !menuRef.current.contains(event.target as Node)
+    ) {
+      setMenuOpen(false);
+    }
+  };
+
+  document.addEventListener("mousedown", handleOutsideClick);
+
+  return () => {
+    document.removeEventListener("mousedown", handleOutsideClick);
+  };
+}, [menuOpen]);
 
   const updateCloseOnOutsideClick = (value: boolean) => {
     setCloseOnOutsideClick(value);
@@ -1127,7 +1146,7 @@ const getDisplayTitle = (item: CopyPastable) => item.title;
   <span>New</span>
 </button>
 
-          <div className="relative">
+          <div ref={menuRef} className="relative">
             <button
               className="h-[29px] rounded-[5px] border border-[#303030] bg-[#181818] px-[9px] text-[13px] tracking-wider text-[#b3b3b3] transition-colors hover:border-[#3a3a3a] hover:bg-[#242424] hover:text-[#f2f2f2]"
               onClick={() => setMenuOpen(!menuOpen)}
