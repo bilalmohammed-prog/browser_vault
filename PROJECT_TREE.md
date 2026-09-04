@@ -17,11 +17,13 @@ browser_vault/
 │   ├── background.ts
 │   ├── content.ts
 │   ├── main.tsx
+│   ├── offscreen.ts
 │   ├── styles.css
 │   ├── types.ts
 │   └── vite-env.d.ts
 ├── .gitignore
 ├── index.html
+├── offscreen.html
 ├── package-lock.json
 ├── package.json
 ├── README.md

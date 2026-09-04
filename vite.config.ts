@@ -10,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: "index.html",
+        offscreen: "offscreen.html",
         content: "src/content.ts",
         background: "src/background.ts",
       },

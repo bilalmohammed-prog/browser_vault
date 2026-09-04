@@ -41,6 +41,15 @@ import {
   validateBackup,
 } from "./storage/vault";
 
+declare const chrome: {
+  runtime: {
+    sendMessage: (message: {
+      type: "BROWSER_VAULT_COPY";
+      text: string;
+    }) => Promise<{ success: boolean }>;
+  };
+};
+
 type EditorState = {
   kind: "file" | "folder";
   item?: CopyPastable | Folder;
@@ -440,9 +449,16 @@ export default function App() {
 
   const copyItem = async (item: CopyPastable) => {
     try {
-      await navigator.clipboard.writeText(item.content);
+      console.log("[Vault Copy] App: sending COPY message");
+      const result = await chrome.runtime.sendMessage({
+        type: "BROWSER_VAULT_COPY",
+        text: item.content,
+      });
+      console.log("[Vault Copy] App: received response", result);
+      if (!result?.success) throw new Error("Clipboard access failed.");
       setNotice("Copied!");
-    } catch {
+    } catch (error) {
+      console.error("[Vault Copy] App: sendMessage/error", error);
       setNotice("Clipboard access failed. Check your browser permissions and try again.");
     }
   };

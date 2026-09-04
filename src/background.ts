@@ -6,6 +6,20 @@ type ChromeMessage = {
   type: "BROWSER_VAULT_TOGGLE";
 };
 
+type CopyMessage = {
+  type: "BROWSER_VAULT_COPY";
+  text: string;
+};
+
+type OffscreenCopyMessage = {
+  type: "BROWSER_VAULT_OFFSCREEN_COPY";
+  text: string;
+};
+
+type CopyResponse = {
+  success: boolean;
+};
+
 type ChromeApi = {
   commands: {
     onCommand: {
@@ -27,6 +41,26 @@ type ChromeApi = {
   };
   runtime: {
     getURL: (path: string) => string;
+    sendMessage: (
+      message: OffscreenCopyMessage,
+    ) => Promise<CopyResponse>;
+    onMessage: {
+      addListener: (
+        listener: (
+          message: CopyMessage | OffscreenCopyMessage,
+          sender: unknown,
+          sendResponse: (response: CopyResponse) => void,
+        ) => boolean | void,
+      ) => void;
+    };
+  };
+  offscreen: {
+    hasDocument: () => Promise<boolean>;
+    createDocument: (details: {
+      url: string;
+      reasons: ["CLIPBOARD"];
+      justification: string;
+    }) => Promise<void>;
   };
   scripting: {
     executeScript: (details: {
@@ -39,6 +73,54 @@ type ChromeApi = {
 declare const chrome: ChromeApi;
 
 export {};
+
+let offscreenCreation: Promise<void> | null = null;
+
+const ensureOffscreenDocument = async () => {
+  console.log("[Vault Copy] Background: creating/checking offscreen");
+  if (await chrome.offscreen.hasDocument()) {
+    console.log("[Vault Copy] Background: offscreen ready");
+    return;
+  }
+  if (!offscreenCreation) {
+    offscreenCreation = chrome.offscreen
+      .createDocument({
+        url: "offscreen.html",
+        reasons: ["CLIPBOARD"],
+        justification: "Copy vault text to the system clipboard.",
+      })
+      .finally(() => {
+        offscreenCreation = null;
+      });
+  }
+  await offscreenCreation;
+  console.log("[Vault Copy] Background: offscreen ready");
+};
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type !== "BROWSER_VAULT_COPY") return;
+
+  console.log("[Vault Copy] Background: received COPY message");
+
+  void ensureOffscreenDocument()
+    .then(() => {
+      console.log("[Vault Copy] Background: sending to offscreen");
+      return chrome.runtime.sendMessage({
+        type: "BROWSER_VAULT_OFFSCREEN_COPY",
+        text: message.text,
+      });
+    })
+    .then((response) => {
+      console.log("[Vault Copy] Background: offscreen response", response);
+      sendResponse(response);
+    })
+    .catch((error) => {
+      console.error("[Vault Copy] Background: error", error);
+      sendResponse({ success: false });
+    });
+
+  return true;
+});
 
 const togglePanel = async (tabId: number) => {
   console.log("[Browser Vault background] tab ID received:", tabId);
